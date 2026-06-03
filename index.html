@@ -583,25 +583,34 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
 
 <!-- CONFIG MODAL (admin only) -->
 <div class="modal-overlay" id="config-modal">
-  <div class="modal-box" style="max-width:420px">
+  <div class="modal-box" style="max-width:460px">
     <div class="modal-header">
       <span style="font-size:16px;font-weight:700">⚙️ Configurações do Site</span>
       <button class="modal-close" onclick="closeModal('config-modal')">×</button>
     </div>
     <div class="modal-body" style="padding:24px">
+      <div style="background:rgba(245,158,11,.08);border:1px solid #f59e0b;border-radius:8px;padding:12px 14px;font-size:12px;color:#f59e0b;margin-bottom:18px">
+        ⚠️ Estas configurações ficam salvas no <strong>seu navegador</strong>. Configure uma vez e o site funcionará corretamente.
+      </div>
       <div class="form-group">
-        <label>Código do Perfil (sistema de gestão)</label>
-        <input type="text" id="cfg-perfil" placeholder="master" value="">
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">É o mesmo código que você usa para entrar no sistema de gestão</div>
+        <label>Perfil da Loja</label>
+        <select id="cfg-perfil-select" style="width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none;margin-bottom:6px" onchange="document.getElementById('cfg-perfil').value=this.value">
+          <option value="">Carregando perfis...</option>
+        </select>
+        <input type="text" id="cfg-perfil" placeholder="Ou digite o código do perfil manualmente" value="">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Selecione o perfil da sua loja acima</div>
       </div>
       <div class="form-group">
         <label>Chave PIX para recebimento</label>
-        <input type="text" id="cfg-pix" placeholder="Ex: 31975174545 ou seu@email.com">
+        <input type="text" id="cfg-pix" placeholder="Ex: storemenline@gmail.com ou (31) 97517-4545">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">E-mail, CPF, CNPJ, telefone ou chave aleatória cadastrada no seu banco</div>
       </div>
       <div id="cfg-msg" class="form-msg"></div>
       <button class="btn-primary" style="width:100%;padding:12px" onclick="salvarConfigSite()">💾 Salvar e recarregar</button>
     </div>
   </div>
+</div>
+
 </div>
 
 <!-- TOAST -->
@@ -637,6 +646,17 @@ window.addEventListener('DOMContentLoaded',async()=>{
   // Set logo
   const logoB64=LOGO_BASE64;
   document.querySelectorAll('.logo-img,[id$="-logo"]').forEach(el=>el.src=logoB64);
+  // Show setup banner if not configured yet
+  const perfilSalvo=localStorage.getItem('mls_perfil');
+  if(!perfilSalvo||perfilSalvo==='master'){
+    const banner=document.createElement('div');
+    banner.id='setup-banner';
+    banner.style.cssText='position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:1000;background:#1a1c24;border:1px solid #f59e0b;border-radius:10px;padding:12px 20px;font-size:13px;color:#f59e0b;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:500px;width:calc(100% - 32px)';
+    banner.innerHTML='⚙️ <span>Site não configurado. <strong>Clique aqui</strong> para selecionar o perfil da sua loja e ativar os produtos.</span>';
+    banner.style.cursor='pointer';
+    banner.onclick=()=>{abrirConfigSite();banner.remove();};
+    document.body.appendChild(banner);
+  }
   // Load products
   await loadProducts();
   // Render cart
@@ -941,6 +961,17 @@ function selectPay(method,btn){
   document.getElementById('pay-info').innerHTML=info[method]||'';
 }
 
+// ── TAXAS MP (busca do sistema de gestão) ───────────────────────
+async function getTaxasMP(){
+  try{
+    const cfg=await api('empresa_config?perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&select=taxas_mp').catch(()=>[]);
+    if(cfg&&cfg[0]?.taxas_mp){
+      return typeof cfg[0].taxas_mp==='string'?JSON.parse(cfg[0].taxas_mp):cfg[0].taxas_mp;
+    }
+  }catch(e){}
+  return {pix:0.99,cartao:4.98,boleto:2.99};
+}
+
 async function confirmarPedido(){
   const nome=document.getElementById('chk-nome')?.value?.trim();
   const email=document.getElementById('chk-email')?.value?.trim();
@@ -964,9 +995,37 @@ async function confirmarPedido(){
         clienteId=(novo&&novo[0])?novo[0].id:null;
       }
     }
-    // 2. Gerar pedido no WhatsApp + mostrar instrução de pagamento
-    const itensTxt=cart.map(i=>`• ${i.nome}${i.genero?' '+i.genero:''}${i.tamanho?' Tam.'+i.tamanho:''} (${i.qty}x) — R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}`).join('\n');
-    const waMsg=encodeURIComponent(`Olá! Gostaria de confirmar meu pedido:\n\n${itensTxt}\n\nTotal: R$ ${total.toFixed(2).replace('.',',')}\n\nNome: ${nome}\nCEP: ${cep}\nEndereço: ${end}, ${cidade}-${uf}\nPagamento: ${selectedPayment.toUpperCase()}`);
+    // 2. Registrar venda no financeiro com cálculo da taxa MP
+    const taxas=await getTaxasMP();
+    const taxaRate={pix:taxas.pix??0.99,cartao:taxas.cartao??4.98,boleto:taxas.boleto??2.99};
+    const taxa=taxaRate[selectedPayment]||0;
+    const valorBruto=total;
+    const valorTaxa=parseFloat((valorBruto*(taxa/100)).toFixed(2));
+    const valorLiquido=parseFloat((valorBruto-valorTaxa).toFixed(2));
+    const today=new Date().toISOString().slice(0,10);
+    const itensTxt=cart.map(i=>i.nome+(i.genero?' '+i.genero:'')+(i.tamanho?' Tam.'+i.tamanho:'')+' ('+i.qty+'x)').join(', ').slice(0,120);
+    // Receita: valor líquido (o que efetivamente entra na conta)
+    await api('financeiro_lancamentos',{method:'POST',body:JSON.stringify({
+      perfil_codigo:PERFIL,tipo:'receita',status:selectedPayment==='boleto'?'pendente':'pago',
+      descricao:'Venda Site: '+itensTxt,
+      valor:valorLiquido,
+      data_vencimento:today,data_pagamento:selectedPayment!=='boleto'?today:null,
+      cliente_id:clienteId,
+      observacoes:'Venda registrada pelo site | Pagamento: '+selectedPayment.toUpperCase()+' | Bruto: R$ '+valorBruto.toFixed(2)+(valorTaxa>0?' | Taxa MP '+taxa+'%: -R$ '+valorTaxa.toFixed(2):'')
+    })}).catch(()=>{});
+    // Despesa: taxa MP (somente se > 0)
+    if(valorTaxa>0){
+      await api('financeiro_lancamentos',{method:'POST',body:JSON.stringify({
+        perfil_codigo:PERFIL,tipo:'despesa',status:'pago',
+        descricao:'💳 Taxa MP ('+selectedPayment.toUpperCase()+') — Venda online',
+        valor:valorTaxa,
+        data_vencimento:today,data_pagamento:today,
+        observacoes:'GASTO_LOJA:💳 Taxa MP'
+      })}).catch(()=>{});
+    }
+    // 3. Gerar link WhatsApp
+    const itensTxtWA=cart.map(i=>`• ${i.nome}${i.genero?' '+i.genero:''}${i.tamanho?' Tam.'+i.tamanho:''} (${i.qty}x) — R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}`).join('\n');
+    const waMsg=encodeURIComponent(`Olá! Gostaria de confirmar meu pedido:\n\n${itensTxtWA}\n\nTotal: R$ ${total.toFixed(2).replace('.',',')}\n\nNome: ${nome}\nCEP: ${cep}\nEndereço: ${end}, ${cidade}-${uf}\nPagamento: ${selectedPayment.toUpperCase()}`);
     // 3. Mostrar confirmação com PIX/pagamento
     const body=document.getElementById('checkout-body');
     body.innerHTML=`
@@ -978,8 +1037,8 @@ async function confirmarPedido(){
       ${selectedPayment==='pix'?`
       <div class="pix-box">
         <p style="font-weight:600;margin-bottom:12px">Chave PIX:</p>
-        <div class="pix-key">${localStorage.getItem('mls_pix_key')||'31975174545'}<br><span style="font-size:11px;color:var(--text3)">(Celular / WhatsApp)</span></div>
-        <button class="btn-copy" onclick="navigator.clipboard.writeText('${localStorage.getItem('mls_pix_key')||'31975174545'}');toast('✅ Chave copiada!','success')">📋 Copiar chave PIX</button>
+        <div class="pix-key">${localStorage.getItem('mls_pix_key')||'storemenline@gmail.com'}<br><span style="font-size:11px;color:var(--text3)">(Celular / WhatsApp)</span></div>
+        <button class="btn-copy" onclick="navigator.clipboard.writeText('${localStorage.getItem('mls_pix_key')||'storemenline@gmail.com'}');toast('✅ Chave copiada!','success')">📋 Copiar chave PIX</button>
         <p style="margin-top:16px;font-size:12px;color:var(--text3)">Após o pagamento, envie o comprovante pelo WhatsApp para agilizarmos o envio.</p>
       </div>`
       :`<div style="text-align:center;padding:8px 0 20px;color:var(--text2);font-size:13px">Você será redirecionado para o Mercado Pago para concluir o pagamento com segurança.</div>`}
@@ -1154,17 +1213,38 @@ function closeAll(){
 }
 
 // ── SITE CONFIG (admin) ──────────────────────────────────────────
-function abrirConfigSite(){
-  document.getElementById('cfg-perfil').value=localStorage.getItem('mls_perfil')||'master';
-  document.getElementById('cfg-pix').value=localStorage.getItem('mls_pix_key')||'31975174545';
+async function abrirConfigSite(){
+  document.getElementById('cfg-perfil').value=localStorage.getItem('mls_perfil')||'';
+  document.getElementById('cfg-pix').value=localStorage.getItem('mls_pix_key')||'storemenline@gmail.com';
   document.getElementById('cfg-msg').style.display='none';
+  // Carregar perfis disponíveis
+  const sel=document.getElementById('cfg-perfil-select');
+  try{
+    const perfis=await api('perfis?select=codigo,nome&order=nome.asc').catch(()=>null)
+      || await api('usuarios?select=perfil&order=perfil.asc').catch(()=>[]);
+    const atual=localStorage.getItem('mls_perfil')||'';
+    if(perfis&&perfis.length){
+      const opts=perfis.map(p=>{
+        const cod=p.codigo||p.perfil||'';
+        const nom=p.nome||cod;
+        return `<option value="${cod}" ${cod===atual?'selected':''}>${nom} (${cod})</option>`;
+      });
+      sel.innerHTML='<option value="">Selecione o perfil da loja...</option>'+opts.join('');
+    } else {
+      sel.innerHTML='<option value="">Não foi possível carregar — digite manualmente abaixo</option>';
+    }
+  }catch(e){sel.innerHTML='<option value="">Digite o código manualmente abaixo</option>';}
   document.getElementById('config-modal').classList.add('open');
   document.getElementById('backdrop').classList.add('show');
 }
+
 function salvarConfigSite(){
-  const perfil=document.getElementById('cfg-perfil').value.trim();
+  const perfilSel=document.getElementById('cfg-perfil-select')?.value?.trim();
+  const perfilMan=document.getElementById('cfg-perfil').value.trim();
+  const perfil=perfilSel||perfilMan;
   const pix=document.getElementById('cfg-pix').value.trim();
-  if(!perfil){const m=document.getElementById('cfg-msg');m.style.display='block';m.className='form-msg error';m.textContent='Informe o código do perfil.';return;}
+  const msg=document.getElementById('cfg-msg');
+  if(!perfil){msg.style.display='block';msg.className='form-msg error';msg.textContent='Selecione ou informe o código do perfil.';return;}
   localStorage.setItem('mls_perfil',perfil);
   if(pix)localStorage.setItem('mls_pix_key',pix);
   closeModal('config-modal');
