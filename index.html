@@ -485,7 +485,6 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
     <div class="footer-bottom">
       <p>© 2026 Men Line Store. Todos os direitos reservados.</p>
       <p>Pagamentos via <strong>Mercado Pago</strong> 🔒</p>
-      <span onclick="abrirConfigSite()" style="color:var(--border);cursor:pointer;font-size:10px;user-select:none" title="Config">⚙</span>
     </div>
   </div>
 </footer>
@@ -581,37 +580,7 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   </div>
 </div>
 
-<!-- CONFIG MODAL (admin only) -->
-<div class="modal-overlay" id="config-modal">
-  <div class="modal-box" style="max-width:460px">
-    <div class="modal-header">
-      <span style="font-size:16px;font-weight:700">⚙️ Configurações do Site</span>
-      <button class="modal-close" onclick="closeModal('config-modal')">×</button>
-    </div>
-    <div class="modal-body" style="padding:24px">
-      <div style="background:rgba(245,158,11,.08);border:1px solid #f59e0b;border-radius:8px;padding:12px 14px;font-size:12px;color:#f59e0b;margin-bottom:18px">
-        ⚠️ Estas configurações ficam salvas no <strong>seu navegador</strong>. Configure uma vez e o site funcionará corretamente.
-      </div>
-      <div class="form-group">
-        <label>Perfil da Loja</label>
-        <select id="cfg-perfil-select" style="width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none;margin-bottom:6px" onchange="document.getElementById('cfg-perfil').value=this.value">
-          <option value="">Carregando perfis...</option>
-        </select>
-        <input type="text" id="cfg-perfil" placeholder="Ou digite o código do perfil manualmente" value="">
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">Selecione o perfil da sua loja acima</div>
-      </div>
-      <div class="form-group">
-        <label>Chave PIX para recebimento</label>
-        <input type="text" id="cfg-pix" placeholder="Ex: storemenline@gmail.com ou (31) 97517-4545">
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">E-mail, CPF, CNPJ, telefone ou chave aleatória cadastrada no seu banco</div>
-      </div>
-      <div id="cfg-msg" class="form-msg"></div>
-      <button class="btn-primary" style="width:100%;padding:12px" onclick="salvarConfigSite()">💾 Salvar e recarregar</button>
-    </div>
-  </div>
-</div>
 
-</div>
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
@@ -621,8 +590,8 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
 const SUPA_URL='https://uqigoyedyaltwjmfysnu.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxaWdveWVkeWFsdHdqbWZ5c251Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNjY2MjcsImV4cCI6MjA5MjY0MjYyN30.EtTJIzn-OITNfp2uraLgSM0HH7ZLLjewa4l0zOggutI';
 // Perfil da loja — lido do localStorage para facilitar configuração
-let PERFIL=localStorage.getItem('mls_perfil')||'master';
-const MP_PUBLIC_KEY=localStorage.getItem('mls_mp_key')||'';
+const PERFIL='lojista'; // Men Line Store — fixo, não requer configuração
+const MP_PUBLIC_KEY='';
 
 // ── API ──────────────────────────────────────────────────────────
 async function api(path,opts={}){
@@ -646,17 +615,6 @@ window.addEventListener('DOMContentLoaded',async()=>{
   // Set logo
   const logoB64=LOGO_BASE64;
   document.querySelectorAll('.logo-img,[id$="-logo"]').forEach(el=>el.src=logoB64);
-  // Show setup banner if not configured yet
-  const perfilSalvo=localStorage.getItem('mls_perfil');
-  if(!perfilSalvo||perfilSalvo==='master'){
-    const banner=document.createElement('div');
-    banner.id='setup-banner';
-    banner.style.cssText='position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:1000;background:#1a1c24;border:1px solid #f59e0b;border-radius:10px;padding:12px 20px;font-size:13px;color:#f59e0b;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:500px;width:calc(100% - 32px)';
-    banner.innerHTML='⚙️ <span>Site não configurado. <strong>Clique aqui</strong> para selecionar o perfil da sua loja e ativar os produtos.</span>';
-    banner.style.cursor='pointer';
-    banner.onclick=()=>{abrirConfigSite();banner.remove();};
-    document.body.appendChild(banner);
-  }
   // Load products
   await loadProducts();
   // Render cart
@@ -1037,8 +995,8 @@ async function confirmarPedido(){
       ${selectedPayment==='pix'?`
       <div class="pix-box">
         <p style="font-weight:600;margin-bottom:12px">Chave PIX:</p>
-        <div class="pix-key">${localStorage.getItem('mls_pix_key')||'storemenline@gmail.com'}<br><span style="font-size:11px;color:var(--text3)">(Celular / WhatsApp)</span></div>
-        <button class="btn-copy" onclick="navigator.clipboard.writeText('${localStorage.getItem('mls_pix_key')||'storemenline@gmail.com'}');toast('✅ Chave copiada!','success')">📋 Copiar chave PIX</button>
+        <div class="pix-key">${'storemenline@gmail.com'}<br><span style="font-size:11px;color:var(--text3)">(Celular / WhatsApp)</span></div>
+        <button class="btn-copy" onclick="navigator.clipboard.writeText('${'storemenline@gmail.com'}');toast('✅ Chave copiada!','success')">📋 Copiar chave PIX</button>
         <p style="margin-top:16px;font-size:12px;color:var(--text3)">Após o pagamento, envie o comprovante pelo WhatsApp para agilizarmos o envio.</p>
       </div>`
       :`<div style="text-align:center;padding:8px 0 20px;color:var(--text2);font-size:13px">Você será redirecionado para o Mercado Pago para concluir o pagamento com segurança.</div>`}
@@ -1212,44 +1170,6 @@ function closeAll(){
   document.getElementById('backdrop').classList.remove('show');
 }
 
-// ── SITE CONFIG (admin) ──────────────────────────────────────────
-async function abrirConfigSite(){
-  document.getElementById('cfg-perfil').value=localStorage.getItem('mls_perfil')||'';
-  document.getElementById('cfg-pix').value=localStorage.getItem('mls_pix_key')||'storemenline@gmail.com';
-  document.getElementById('cfg-msg').style.display='none';
-  // Carregar perfis disponíveis
-  const sel=document.getElementById('cfg-perfil-select');
-  try{
-    const perfis=await api('perfis?select=codigo,nome&order=nome.asc').catch(()=>null)
-      || await api('usuarios?select=perfil&order=perfil.asc').catch(()=>[]);
-    const atual=localStorage.getItem('mls_perfil')||'';
-    if(perfis&&perfis.length){
-      const opts=perfis.map(p=>{
-        const cod=p.codigo||p.perfil||'';
-        const nom=p.nome||cod;
-        return `<option value="${cod}" ${cod===atual?'selected':''}>${nom} (${cod})</option>`;
-      });
-      sel.innerHTML='<option value="">Selecione o perfil da loja...</option>'+opts.join('');
-    } else {
-      sel.innerHTML='<option value="">Não foi possível carregar — digite manualmente abaixo</option>';
-    }
-  }catch(e){sel.innerHTML='<option value="">Digite o código manualmente abaixo</option>';}
-  document.getElementById('config-modal').classList.add('open');
-  document.getElementById('backdrop').classList.add('show');
-}
-
-function salvarConfigSite(){
-  const perfilSel=document.getElementById('cfg-perfil-select')?.value?.trim();
-  const perfilMan=document.getElementById('cfg-perfil').value.trim();
-  const perfil=perfilSel||perfilMan;
-  const pix=document.getElementById('cfg-pix').value.trim();
-  const msg=document.getElementById('cfg-msg');
-  if(!perfil){msg.style.display='block';msg.className='form-msg error';msg.textContent='Selecione ou informe o código do perfil.';return;}
-  localStorage.setItem('mls_perfil',perfil);
-  if(pix)localStorage.setItem('mls_pix_key',pix);
-  closeModal('config-modal');
-  location.reload();
-}
 
 // ── TOAST ────────────────────────────────────────────────────────
 function toast(msg,type='success'){
