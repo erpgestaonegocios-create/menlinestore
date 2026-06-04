@@ -164,8 +164,8 @@ section{padding:80px 24px;}
 
 /* ── PRODUCT DETAIL ── */
 .product-detail{display:grid;grid-template-columns:1fr 1fr;gap:0;}
-.product-detail-img{background:var(--surface2);display:flex;flex-direction:column;align-items:stretch;}
-.product-detail-img img{width:100%;object-fit:contain;display:block;}
+.product-detail-img{background:var(--surface2);display:flex;flex-direction:column;align-items:stretch;overflow:hidden;}
+.product-detail-img img{width:100%;height:100%;object-fit:contain;display:block;max-height:520px;}
 .product-detail-info{padding:32px;overflow-y:auto;}
 .product-detail-info h2{font-size:36px;color:var(--white);margin-bottom:8px;}
 .product-detail-price{font-size:40px;font-family:'Bebas Neue',sans-serif;color:var(--white);margin:12px 0;}
@@ -309,12 +309,36 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   .product-info{padding:10px 12px;}
   .product-name{font-size:13px;}
   .product-price{font-size:18px;}
-  .product-detail{grid-template-columns:1fr;display:block;max-height:92vh;overflow-y:auto;}
-  .product-detail-img{width:100%;}
-  .product-detail-img img{width:100%;height:auto;object-fit:contain;display:block;background:var(--surface2);max-height:60vh;}
-  .product-detail-info{padding:20px 16px;}
+
+  /* Modal produto no mobile: tela cheia, scroll vertical */
+  .modal-overlay{align-items:flex-end;padding:0;}
+  .modal-box{
+    margin:0;border-radius:16px 16px 0 0;
+    max-height:95vh;height:95vh;
+    position:fixed;bottom:0;left:0;right:0;
+    max-width:100%!important;
+    display:flex;flex-direction:column;
+  }
+  .modal-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;}
+
+  /* Produto detail: coluna única, imagem no topo com altura controlada */
+  .product-detail{display:flex;flex-direction:column;}
+  .product-detail-img{
+    width:100%;flex-shrink:0;
+    background:var(--surface2);
+    display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  .product-detail-img img{
+    width:100%;height:auto;
+    max-height:50vw;min-height:200px;
+    object-fit:contain;display:block;
+    padding:12px;
+  }
+  .product-detail-info{padding:20px 16px;overflow-y:visible;}
   .product-detail-info h2{font-size:22px;}
   .product-detail-price{font-size:30px;}
+
   .about-grid{grid-template-columns:1fr;gap:28px;}
   .about-features{grid-template-columns:1fr 1fr;}
   .footer-grid{grid-template-columns:1fr;gap:24px;}
@@ -322,8 +346,6 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   .cart-sidebar{width:100%;max-width:100vw;}
   .checkout-step .step-label{font-size:10px;}
   .form-grid{grid-template-columns:1fr;}
-  .modal-box{margin:0;border-radius:16px 16px 0 0;max-height:92vh;position:fixed;bottom:0;left:0;right:0;max-width:100%!important;}
-  .modal-overlay{align-items:flex-end;padding:0;}
   .filters{gap:6px;}
   .filter-btn{padding:6px 12px;font-size:11px;}
   .search-bar{min-width:160px;}
@@ -339,6 +361,7 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   .btn-icon{width:36px;height:36px;font-size:16px;}
   .hero h1{font-size:clamp(38px,13vw,60px);}
   .product-grid{grid-template-columns:1fr 1fr;gap:10px;}
+  .product-detail-img img{max-height:44vw;min-height:180px;}
   .product-detail-info h2{font-size:20px;}
   .about-features{grid-template-columns:1fr;}
   .hero-cta{flex-direction:column;align-items:center;}
@@ -797,7 +820,7 @@ async function openProduct(id, updateUrl=true){
   let imgs=[];
   if(p.imagens_base64){try{imgs=typeof p.imagens_base64==='string'?JSON.parse(p.imagens_base64):p.imagens_base64;}catch(e){}}
   if(!imgs.length&&p.imagem_base64)imgs=[p.imagem_base64];
-  const imgHtml=imgs.length?`<img src="${imgs[0]}" alt="${p.nome}" id="detail-main-img" style="width:100%;height:100%;object-fit:contain">`:`<span style="font-size:80px;opacity:.3">👔</span>`;
+  const imgHtml=imgs.length?`<img src="${imgs[0]}" alt="${p.nome}" id="detail-main-img" style="width:100%;height:auto;max-height:480px;object-fit:contain;display:block;">`:`<span style="font-size:80px;opacity:.3">👔</span>`;
   // Sizes/genders from saldos
   const disponivel=p._saldos.filter(s=>parseFloat(s.quantidade||0)>0);
   const tamanhos=[...new Set(p._saldos.map(s=>s.tamanho).filter(Boolean))];
@@ -816,7 +839,7 @@ async function openProduct(id, updateUrl=true){
   const thumbs=imgs.length>1?`<div style="display:flex;gap:6px;margin-top:8px;padding:8px;overflow-x:auto">${imgs.map((im,i)=>`<img src="${im}" onclick="document.getElementById('detail-main-img').src=this.src" style="width:56px;height:70px;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid ${i===0?'var(--accent2)':'transparent'};flex-shrink:0">`).join('')}</div>`:'';
   content.innerHTML=`
     <div class="product-detail-img" style="flex-direction:column;align-items:stretch">
-      <div style="width:100%;background:var(--surface2);line-height:0;">${imgHtml}</div>
+      <div style="width:100%;background:var(--surface2);line-height:0;display:flex;align-items:center;justify-content:center;">${imgHtml}</div>
       ${thumbs}
     </div>
     <div class="product-detail-info">
