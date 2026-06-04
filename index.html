@@ -364,10 +364,10 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
       </div>
     </a>
     <nav>
-      <a href="#" class="active" onclick="showSection('home');setNav(this)">Início</a>
-      <a href="#" onclick="showSection('produtos');setNav(this)">Produtos</a>
-      <a href="#" onclick="showSection('sobre');setNav(this)">Sobre</a>
-      <a href="#" onclick="showSection('contato');setNav(this)">Contato</a>
+      <a href="#home" class="active">Início</a>
+      <a href="#produtos">Produtos</a>
+      <a href="#sobre">Sobre</a>
+      <a href="#contato">Contato</a>
     </nav>
     <div class="header-actions">
       <button class="btn-icon" onclick="showSection('produtos');setNavByHref()" title="Buscar">🔍</button>
@@ -381,10 +381,10 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   </div>
   <!-- Mobile menu -->
   <div id="mobile-menu" style="display:none;background:var(--surface);border-top:1px solid var(--border);padding:8px 16px 12px">
-    <a href="#" onclick="showSection('home');closeMobileMenu();setNav(document.querySelectorAll('nav a')[0])" style="display:block;padding:10px 0;color:var(--text2);text-decoration:none;font-size:14px;border-bottom:1px solid var(--border)">Início</a>
-    <a href="#" onclick="showSection('produtos');closeMobileMenu()" style="display:block;padding:10px 0;color:var(--text2);text-decoration:none;font-size:14px;border-bottom:1px solid var(--border)">Produtos</a>
-    <a href="#" onclick="showSection('sobre');closeMobileMenu()" style="display:block;padding:10px 0;color:var(--text2);text-decoration:none;font-size:14px;border-bottom:1px solid var(--border)">Sobre</a>
-    <a href="#" onclick="showSection('contato');closeMobileMenu()" style="display:block;padding:10px 0;color:var(--text2);text-decoration:none;font-size:14px">Contato</a>
+    <a href="#home" onclick="closeMobileMenu()" style="display:block;padding:10px 0;color:var(--text2);text-decoration:none;font-size:14px;border-bottom:1px solid var(--border)">Início</a>
+    <a href="#produtos" onclick="closeMobileMenu()" style="display:block;padding:10px 0;color:var(--text2);text-decoration:none;font-size:14px;border-bottom:1px solid var(--border)">Produtos</a>
+    <a href="#sobre" onclick="closeMobileMenu()" style="display:block;padding:10px 0;color:var(--text2);text-decoration:none;font-size:14px;border-bottom:1px solid var(--border)">Sobre</a>
+    <a href="#contato" onclick="closeMobileMenu()" style="display:block;padding:10px 0;color:var(--text2);text-decoration:none;font-size:14px">Contato</a>
   </div>
 </header>
 
@@ -680,15 +680,11 @@ window.addEventListener('DOMContentLoaded',async()=>{
   // Set logo
   const logoB64=LOGO_BASE64;
   document.querySelectorAll('.logo-img,[id$="-logo"]').forEach(el=>el.src=logoB64);
-  // Load products
+  // Load products then route
   await loadProducts();
-  // Render cart
   renderCart();
-  // Check user session
   updateUserUI();
-  // Auto show section from hash
-  const hash=location.hash.replace('#','');
-  if(hash)showSection(hash);
+  rotear(); // interpreta o hash inicial
 });
 
 // ── LOGOS / ÍCONES (embedded) ─────────────────────────────────────
@@ -791,16 +787,17 @@ function renderAllProducts(){
 }
 
 // ── PRODUCT DETAIL ───────────────────────────────────────────────
-async function openProduct(id){
+async function openProduct(id, updateUrl=true){
   const p=allProducts.find(x=>x.id===id);
   if(!p)return;
+  if(updateUrl) location.hash='produto-'+id;
   const modal=document.getElementById('product-modal');
   const content=document.getElementById('product-detail-content');
   // Get all images
   let imgs=[];
   if(p.imagens_base64){try{imgs=typeof p.imagens_base64==='string'?JSON.parse(p.imagens_base64):p.imagens_base64;}catch(e){}}
   if(!imgs.length&&p.imagem_base64)imgs=[p.imagem_base64];
-  const imgHtml=imgs.length?`<img src="${imgs[0]}" alt="${p.nome}" id="detail-main-img" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-size:80px;opacity:.3">👔</span>`;
+  const imgHtml=imgs.length?`<img src="${imgs[0]}" alt="${p.nome}" id="detail-main-img" style="width:100%;height:100%;object-fit:contain">`:`<span style="font-size:80px;opacity:.3">👔</span>`;
   // Sizes/genders from saldos
   const disponivel=p._saldos.filter(s=>parseFloat(s.quantidade||0)>0);
   const tamanhos=[...new Set(p._saldos.map(s=>s.tamanho).filter(Boolean))];
@@ -1210,24 +1207,50 @@ function enviarMensagem(){
 }
 
 // ── NAVIGATION ──────────────────────────────────────────────────
-function showSection(name){
-  document.querySelectorAll('#main > section,[id^="section-"]').forEach(s=>{s.style.display='none';});
+// ── ROTEADOR ─────────────────────────────────────────────────────────────
+function navigate(hash,scroll=true){
+  // Atualiza a URL
+  location.hash=hash;
+}
+
+function showSection(name,scroll=true){
+  document.querySelectorAll('[id^="section-"]').forEach(s=>{s.style.display='none';});
   const target=document.getElementById('section-'+name);
   if(target)target.style.display='block';
-  window.scrollTo({top:0,behavior:'smooth'});
-  // Atualiza URL sem recarregar a página
-  const newUrl=location.pathname+'#'+name;
-  history.pushState({section:name},document.title,newUrl);
+  if(scroll)window.scrollTo({top:0,behavior:'smooth'});
+  // Atualiza nav ativa
+  document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));
+  const idx={home:0,produtos:1,sobre:2,contato:3}[name];
+  if(idx!==undefined&&document.querySelectorAll('nav a')[idx])
+    document.querySelectorAll('nav a')[idx].classList.add('active');
   if(name==='produtos'){renderAllProducts();buildCategoryFilters();}
 }
-// Suporte ao botão Voltar/Avançar do navegador
-window.addEventListener('popstate',e=>{
-  const name=(e.state&&e.state.section)||location.hash.replace('#','')||'home';
-  document.querySelectorAll('#main > section,[id^="section-"]').forEach(s=>{s.style.display='none';});
-  const target=document.getElementById('section-'+name);
-  if(target)target.style.display='block';
-  if(name==='produtos'){renderAllProducts();buildCategoryFilters();}
-});
+
+// Interpreta o hash atual e mostra a seção/produto correto
+function rotear(){
+  const hash=location.hash.replace('#','');
+  if(!hash||hash==='home'){showSection('home',false);return;}
+  if(hash.startsWith('produto-')){
+    const id=parseInt(hash.replace('produto-',''));
+    if(!isNaN(id)){
+      showSection('produtos',false);
+      // Aguarda produtos carregarem se ainda não carregaram
+      const tentativa=()=>{
+        const p=allProducts.find(x=>x.id===id);
+        if(p){openProduct(id,false);}
+        else if(allProducts.length===0){setTimeout(tentativa,200);}
+      };
+      tentativa();
+    }
+    return;
+  }
+  const secoes=['home','produtos','sobre','contato'];
+  if(secoes.includes(hash)){showSection(hash,false);}
+  else{showSection('home',false);}
+}
+
+// Ouvir mudanças de hash (botão voltar/avançar do celular)
+window.addEventListener('hashchange',()=>rotear());
 
 function toggleMobileMenu(){
   const m=document.getElementById('mobile-menu');
@@ -1248,6 +1271,10 @@ function setSearch(){setTimeout(()=>document.getElementById('search-input')?.foc
 function closeModal(id){
   document.getElementById(id).classList.remove('open');
   document.getElementById('backdrop').classList.remove('show');
+  // Se fechou o modal de produto, volta o hash para a seção atual
+  if(id==='product-modal'&&location.hash.startsWith('#produto-')){
+    location.hash='produtos';
+  }
 }
 function closeAll(){
   document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));
