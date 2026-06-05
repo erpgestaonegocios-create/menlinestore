@@ -1331,11 +1331,33 @@ async function fazerLogin(){
   const email=document.getElementById('login-email').value.trim();
   const senha=document.getElementById('login-senha').value;
   const msg=document.getElementById('login-msg');
-  const showMsg=(t,tp)=>{msg.style.display='block';msg.className='form-msg '+tp;msg.textContent=t;};
+  const showMsg=(t,tp)=>{msg.style.display='block';msg.className='form-msg '+tp;msg.innerHTML=t;};
   if(!email||!senha){showMsg('Preencha e-mail e senha.','error');return;}
   try{
+    // 1. Verificar se o email existe
+    const emailRows=await api('clientes?email=eq.'+encodeURIComponent(email)+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&select=id');
+    if(!emailRows||!emailRows.length){
+      // Email não cadastrado — redirecionar para criar conta com countdown
+      let sec=3;
+      showMsg(`Você ainda não tem cadastro. Redirecionando para criar conta em <strong>${sec}s</strong>...`,'error');
+      const timer=setInterval(()=>{
+        sec--;
+        if(sec<=0){
+          clearInterval(timer);
+          authTab('register');
+          // Pré-preencher o email no formulário de cadastro
+          const regEmail=document.getElementById('reg-email');
+          if(regEmail)regEmail.value=email;
+          msg.style.display='none';
+        } else {
+          showMsg(`Você ainda não tem cadastro. Redirecionando para criar conta em <strong>${sec}s</strong>...`,'error');
+        }
+      },1000);
+      return;
+    }
+    // 2. Verificar senha
     const rows=await api('clientes?email=eq.'+encodeURIComponent(email)+'&senha_hash=eq.'+encodeURIComponent(senha)+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&select=id,nome,email,telefone,cep,endereco,cidade,estado');
-    if(!rows||!rows.length){showMsg('E-mail ou senha incorretos.','error');return;}
+    if(!rows||!rows.length){showMsg('Senha incorreta. Tente novamente.','error');return;}
     currentUser=rows[0];
     localStorage.setItem('mls_user',JSON.stringify(currentUser));
     updateUserUI();
