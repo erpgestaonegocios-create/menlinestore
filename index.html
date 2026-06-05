@@ -904,6 +904,7 @@ async function openProduct(id, updateUrl=true){
     </div>`;
   modal.classList.add('open');
   document.getElementById('backdrop').classList.add('show');
+  document.body.style.overflow='hidden';
   setTimeout(()=>{
     const img=document.getElementById('detail-main-img');
     if(img && window.innerWidth<=768){
@@ -1356,6 +1357,7 @@ function setSearch(){setTimeout(()=>document.getElementById('search-input')?.foc
 function closeModal(id){
   document.getElementById(id).classList.remove('open');
   document.getElementById('backdrop').classList.remove('show');
+  document.body.style.overflow='';
   // Se fechou o modal de produto, volta o hash para a seção atual
   if(id==='product-modal'&&location.hash.startsWith('#produto-')){
     location.hash='produtos';
@@ -1365,6 +1367,7 @@ function closeAll(){
   document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));
   document.getElementById('cart-sidebar').classList.remove('open');
   document.getElementById('backdrop').classList.remove('show');
+  document.body.style.overflow='';
 }
 
 
