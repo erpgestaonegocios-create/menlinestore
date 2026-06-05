@@ -339,29 +339,23 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
     max-width:100%!important;
     display:flex;flex-direction:column;
   }
-  /* No mobile, modal-body vira coluna com scroll total */
-  .modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;}
 
-  /* Produto detail no mobile: empilha verticalmente */
-  .product-detail{display:flex;flex-direction:column;overflow:visible;flex:none;}
-  .product-detail-img{width:100%;overflow:hidden;flex-shrink:0;background:#f0f0f0;}
-  .product-detail-img .main-img-wrap{
-    width:100%;
-    /* altura setada por JS via fixImgWrapHeight() */
-    position:relative;
-    overflow:hidden;
-    background:#f0f0f0;
-  }
+  /* Produto detail no mobile: TUDO simples, sem flex, sem position */
+  .product-detail{display:block;}
+  .product-detail-img{display:block;width:100%;background:#f0f0f0;}
+  .product-detail-img .main-img-wrap{display:block;width:100%;background:#f0f0f0;line-height:0;}
   .product-detail-img .main-img-wrap img{
-    position:absolute;
-    inset:0;
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    padding:16px;
     display:block;
+    width:100%;
+    height:80vw;        /* altura fixa: 80% da largura da tela */
+    max-height:340px;
+    object-fit:contain;
+    padding:12px;
+    position:static !important;  /* cancela qualquer position:absolute */
+    inset:auto !important;
   }
-  .product-detail-info{padding:20px 16px;overflow-y:visible;}
+  .product-detail-info{display:block;padding:20px 16px;}
   .product-detail-info h2{font-size:22px;}
   .product-detail-price{font-size:30px;}
 
@@ -907,18 +901,6 @@ async function openProduct(id, updateUrl=true){
     </div>`;
   modal.classList.add('open');
   document.getElementById('backdrop').classList.add('show');
-  fixImgWrapHeight();
-}
-
-function fixImgWrapHeight(){
-  // Só aplica no mobile
-  if(window.innerWidth > 768) return;
-  const wrap = document.getElementById('main-img-wrap');
-  if(!wrap) return;
-  // Altura = largura da tela (quadrado), já que wrap tem width:100%
-  const w = wrap.getBoundingClientRect().width || window.innerWidth;
-  wrap.style.height = w + 'px';
-  wrap.style.paddingBottom = '0';
 }
 
 function setMainImg(thumbEl, src){
