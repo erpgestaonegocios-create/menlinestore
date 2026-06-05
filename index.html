@@ -757,15 +757,14 @@ let notifyProductId=null;
 let notifyProductName='';
 
 // ── INIT ────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded',async()=>{
+window.addEventListener('DOMContentLoaded',()=>{
   // Set logo
   const logoB64=LOGO_BASE64;
   document.querySelectorAll('.logo-img,[id$="-logo"]').forEach(el=>el.src=logoB64);
-  // Load products then route
-  await loadProducts();
   renderCart();
   updateUserUI();
   rotear(); // interpreta o hash inicial
+  loadProducts(); // roda em paralelo — ao terminar, verifica _pendingRenderProdutos
 });
 
 // ── LOGOS / ÍCONES (embedded) ─────────────────────────────────────
@@ -1011,6 +1010,20 @@ function changeQty(delta){
 // ── CART ────────────────────────────────────────────────────────
 function addToCart(prodId){
   const p=allProducts.find(x=>x.id===prodId);if(!p)return;
+  const msgEl=document.getElementById('detail-stock');
+  // Verificar se produto tem tamanhos disponíveis
+  const tamanhos=[...new Set((p._saldos||[]).map(s=>s.tamanho).filter(Boolean))];
+  const generos=[...new Set((p._saldos||[]).map(s=>s.genero).filter(Boolean))];
+  // Validar seleção obrigatória de tamanho
+  if(tamanhos.length>0&&!selectedSize){
+    if(msgEl)msgEl.innerHTML='<span style="color:var(--danger)">⚠️ Selecione um <strong>tamanho</strong> antes de adicionar ao carrinho.</span>';
+    return;
+  }
+  // Validar seleção obrigatória de gênero
+  if(generos.length>0&&!selectedGenero){
+    if(msgEl)msgEl.innerHTML='<span style="color:var(--danger)">⚠️ Selecione um <strong>gênero</strong> antes de adicionar ao carrinho.</span>';
+    return;
+  }
   const key=`${prodId}_${selectedGenero||''}_${selectedSize||''}`;
   // Validar estoque antes de adicionar
   const saldo=p._saldos.find(s=>
