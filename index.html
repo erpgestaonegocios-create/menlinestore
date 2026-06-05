@@ -166,29 +166,26 @@ section{padding:80px 24px;}
 /* ── PRODUCT DETAIL ── */
 .product-detail{display:grid;grid-template-columns:1fr 1fr;gap:0;flex:1;overflow:hidden;}
 
-/* LADO ESQUERDO: coluna da imagem */
 .product-detail-img{background:#f0f0f0;display:flex;flex-direction:column;overflow:hidden;}
 
-/* Container da imagem principal: ocupa todo espaço disponível */
+/* Técnica padding-bottom: cria altura proporcional independente de flex/load */
 .product-detail-img .main-img-wrap{
+  position:relative;
+  width:100%;
   flex:1;
-  display:flex;align-items:center;justify-content:center;
   overflow:hidden;
   background:#f0f0f0;
 }
-
-/* A imagem em si: nunca ultrapassa o container */
 .product-detail-img .main-img-wrap img{
-  display:block;
-  max-width:100%;
-  max-height:100%;
-  width:auto;
-  height:auto;
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
   object-fit:contain;
   padding:20px;
+  display:block;
 }
 
-/* LADO DIREITO: info com scroll próprio */
 .product-detail-info{padding:32px;overflow-y:auto;}
 .product-detail-info h2{font-size:36px;color:var(--white);margin-bottom:8px;}
 .product-detail-price{font-size:40px;font-family:'Bebas Neue',sans-serif;color:var(--white);margin:12px 0;}
@@ -347,28 +344,24 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
 
   /* Produto detail no mobile: empilha verticalmente */
   .product-detail{display:flex;flex-direction:column;overflow:visible;flex:none;}
+  .product-detail-img{width:100%;overflow:hidden;flex-shrink:0;background:#f0f0f0;}
 
-  /* Coluna da imagem: largura total, altura definida pelo aspect-ratio */
-  .product-detail-img{width:100%;overflow:hidden;flex-shrink:0;}
-
-  /* Container da imagem: aspect-ratio 1:1 garante altura sem precisar de flex */
+  /* padding-bottom:100% = quadrado garantido, sem depender de flex height */
   .product-detail-img .main-img-wrap{
+    position:relative;
     width:100%;
-    aspect-ratio:1/1;
-    display:flex;align-items:center;justify-content:center;
-    overflow:hidden;
-    background:#f0f0f0;
+    padding-bottom:90%;  /* 90% da largura = altura */
+    flex:none;
+    height:0;
   }
-
-  /* Imagem: preenche o container sem cortar */
   .product-detail-img .main-img-wrap img{
-    display:block;
-    max-width:100%;
-    max-height:100%;
-    width:auto;
-    height:auto;
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
     object-fit:contain;
     padding:16px;
+    display:block;
   }
 
   .product-detail-info{padding:20px 16px;overflow-y:visible;}
@@ -397,7 +390,7 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   .btn-icon{width:36px;height:36px;font-size:16px;}
   .hero h1{font-size:clamp(38px,13vw,60px);}
   .product-grid{grid-template-columns:1fr 1fr;gap:10px;}
-  .product-detail-img .main-img-wrap{aspect-ratio:1/1;}
+  .product-detail-img .main-img-wrap{padding-bottom:90%;}
   .product-detail-info h2{font-size:20px;}
   .about-features{grid-template-columns:1fr;}
   .hero-cta{flex-direction:column;align-items:center;}
@@ -885,7 +878,7 @@ async function openProduct(id, updateUrl=true){
     </div>`:'';
   const mainImgHtml=imgs.length
     ?`<img src="${imgs[0]}" alt="${p.nome}" id="detail-main-img">`
-    :`<span style="font-size:80px;opacity:.3">👔</span>`;
+    :`<span style="font-size:80px;opacity:.3;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)">👔</span>`;
   content.innerHTML=`
     <div class="product-detail-img">
       <div class="main-img-wrap">
@@ -920,8 +913,8 @@ async function openProduct(id, updateUrl=true){
 }
 
 function setMainImg(thumbEl, src){
-  document.getElementById('detail-main-img').src=src;
-  // Highlight active thumb
+  const img=document.getElementById('detail-main-img');
+  if(img) img.src=src;
   thumbEl.parentElement.querySelectorAll('div[onclick]').forEach(d=>d.style.borderColor='var(--border)');
   thumbEl.style.borderColor='var(--accent2)';
 }
