@@ -1041,6 +1041,7 @@ function openCheckout(){
     <button class="btn-primary" style="width:100%;padding:14px;font-size:15px" onclick="confirmarPedido()">Confirmar pedido →</button>
   `;
   document.getElementById('checkout-modal').classList.add('open');
+  document.documentElement.style.overflow='hidden';
   document.getElementById('backdrop').classList.add('show');
 }
 
@@ -1169,6 +1170,7 @@ function openAuth(){
   if(currentUser){document.getElementById('auth-logged-out').style.display='none';document.getElementById('auth-logged-in').style.display='block';}
   else{document.getElementById('auth-logged-out').style.display='block';document.getElementById('auth-logged-in').style.display='none';}
   document.getElementById('auth-modal').classList.add('open');
+  document.documentElement.style.overflow='hidden';
   document.getElementById('backdrop').classList.add('show');
 }
 
@@ -1241,6 +1243,7 @@ function openNotify(prodId,prodNome){
   }
   closeModal('product-modal');
   document.getElementById('notify-modal').classList.add('open');
+  document.documentElement.style.overflow='hidden';
   document.getElementById('backdrop').classList.add('show');
 }
 
