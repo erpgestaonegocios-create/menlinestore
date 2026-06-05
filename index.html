@@ -1104,7 +1104,7 @@ function toggleCart(){
 // ── CHECKOUT ────────────────────────────────────────────────────
 let pendingCheckout=false;
 let selectedEntrega='correios';
-function openCheckout(){
+async function openCheckout(){
   if(!cart.length){toast('Carrinho vazio!','error');return;}
   selectedEntrega='correios'; // reset a cada abertura
   document.getElementById('cart-sidebar').classList.remove('open');
@@ -1114,6 +1114,14 @@ function openCheckout(){
     openAuth();
     return;
   }
+  // Recarregar dados frescos do cliente do banco (garante campos novos preenchidos)
+  try{
+    const fresh=await api('clientes?id=eq.'+currentUser.id+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&select=*&limit=1');
+    if(fresh&&fresh[0]){
+      currentUser={...currentUser,...fresh[0]};
+      localStorage.setItem('mls_user',JSON.stringify(currentUser));
+    }
+  }catch(e){ console.warn('Não foi possível atualizar dados do cliente:',e); }
   const total=cart.reduce((s,i)=>s+i.preco*i.qty,0);
   const body=document.getElementById('checkout-body');
   const user=currentUser;
@@ -1137,8 +1145,13 @@ function openCheckout(){
       </div>
       <div class="form-grid">
         <div class="form-group"><label>CEP</label><input type="text" id="chk-cep" value="${user?.cep||''}" placeholder="00000-000" oninput="buscarCepChk(this.value)"></div>
-        <div class="form-group"><label>Endereço</label><input type="text" id="chk-end" value="${user?.endereco||''}" placeholder="Rua, nº, complemento"></div>
+        <div class="form-group"><label>Endereço</label><input type="text" id="chk-end" value="${user?.endereco||''}" placeholder="Rua, avenida..."></div>
       </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Número</label><input type="text" id="chk-num" value="${user?.numero||''}" placeholder="Ex: 212"></div>
+        <div class="form-group"><label>Complemento</label><input type="text" id="chk-comp" value="${user?.complemento||''}" placeholder="Apto, bloco... (opcional)"></div>
+      </div>
+      <div class="form-group"><label>Bairro</label><input type="text" id="chk-bairro" value="${user?.bairro||''}" placeholder="Seu bairro"></div>
       <div class="form-grid">
         <div class="form-group"><label>Cidade</label><input type="text" id="chk-cidade" value="${user?.cidade||''}" placeholder="Sua cidade"></div>
         <div class="form-group"><label>Estado</label><input type="text" id="chk-uf" value="${user?.estado||''}" placeholder="MG" maxlength="2"></div>
@@ -1228,11 +1241,21 @@ async function confirmarPedido(){
   const tel=document.getElementById('chk-tel')?.value?.trim();
   const cep=document.getElementById('chk-cep')?.value?.trim();
   const end=document.getElementById('chk-end')?.value?.trim();
+  const num=document.getElementById('chk-num')?.value?.trim();
+  const comp=document.getElementById('chk-comp')?.value?.trim();
+  const bairro=document.getElementById('chk-bairro')?.value?.trim();
   const cidade=document.getElementById('chk-cidade')?.value?.trim();
   const uf=document.getElementById('chk-uf')?.value?.trim();
   const msg=document.getElementById('chk-msg');
   const showMsg=(t,tp)=>{if(msg){msg.style.display='block';msg.className='form-msg '+tp;msg.textContent=t;}};
-  if(!nome||!email||!tel||!cep||!end){showMsg('Preencha todos os campos obrigatórios.','error');return;}
+  if(!nome){showMsg('Preencha o nome completo.','error');return;}
+  if(!email){showMsg('Preencha o e-mail.','error');return;}
+  if(!tel){showMsg('Preencha o WhatsApp.','error');return;}
+  if(!cep){showMsg('Preencha o CEP.','error');return;}
+  if(!end){showMsg('Preencha o endereço.','error');return;}
+  if(!num){showMsg('Preencha o número.','error');return;}
+  if(!bairro){showMsg('Preencha o bairro.','error');return;}
+  if(!cidade){showMsg('Preencha a cidade.','error');return;}
   const total=cart.reduce((s,i)=>s+i.preco*i.qty,0);
   try{
     // 1. Criar/atualizar cliente no sistema
@@ -1278,7 +1301,17 @@ async function confirmarPedido(){
     // Atualizar forma_entrega nas compras do cliente (últimas registradas)
     if(clienteId){
       api('cliente_compras?cliente_id=eq.'+clienteId+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&order=id.desc&limit='+cart.length,
-        {method:'PATCH',body:JSON.stringify({forma_entrega:selectedEntrega})}).catch(()=>{});
+        {method:'PATCH',body:JSON.stringify({
+          forma_entrega:selectedEntrega,
+          endereco_entrega:end,
+          numero_entrega:num||null,
+          complemento_entrega:comp||null,
+          bairro_entrega:bairro||null,
+          cidade_entrega:cidade,
+          estado_entrega:uf,
+          cep_entrega:cep,
+          forma_pagamento:selectedPayment
+        })}).catch(()=>{});
     }
     // 4. Gerar link WhatsApp
     const itensTxtWA=cart.map(i=>`• ${i.nome}${i.genero?' '+i.genero:''}${i.tamanho?' Tam.'+i.tamanho:''} (${i.qty}x) — R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}`).join('\n');
@@ -1364,7 +1397,16 @@ function buscarCepReg(v){
     }
   }).catch(()=>{});
 }
-function buscarCepChk(v){buscarCep(v,'','chk-end','chk-cidade','chk-uf');}
+function buscarCepChk(v){
+  const clean=v.replace(/\D/g,'');
+  if(clean.length<8)return;
+  fetch(`https://viacep.com.br/ws/${clean}/json/`).then(r=>r.json()).then(d=>{
+    if(!d.erro){
+      const s=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
+      s('chk-end',d.logradouro);s('chk-bairro',d.bairro);s('chk-cidade',d.localidade);s('chk-uf',d.uf);
+    }
+  }).catch(()=>{});
+}
 
 // ── AUTH ────────────────────────────────────────────────────────
 function openAuth(tab='login'){
