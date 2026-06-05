@@ -1129,7 +1129,7 @@ function renderCart(){
           <div class="cart-item-price" style="margin-left:4px">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</div>
         </div>
       </div>
-      <button class="cart-item-remove" onclick="removeFromCart('${i.key}')" title="Remover item">×</button>
+      <button class="cart-item-remove" onclick="removeFromCart('${i.key}')" title="Remover item" style="font-size:15px;opacity:.6">🗑️</button>
     </div>`).join('');
   document.getElementById('cart-total-val').textContent='R$ '+total.toFixed(2).replace('.',',');
   footer.style.display='block';
