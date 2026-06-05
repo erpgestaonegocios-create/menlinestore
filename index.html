@@ -1062,7 +1062,7 @@ function addToCart(prodId){
     return;
   }
   if(existing){existing.qty+=selectedQty;}
-  else{cart.push({key,prodId,nome:p.nome,preco:parseFloat(p.preco_venda||0),genero:selectedGenero,tamanho:selectedSize,qty:selectedQty,img:p.imagem_base64||''});}
+  else{cart.push({key,id:p.id,prodId,nome:p.nome,preco:parseFloat(p.preco_venda||0),genero:selectedGenero,tamanho:selectedSize,qty:selectedQty,img:p.imagem_base64||''});}
   saveCart();renderCart();
   closeModal('product-modal');
   toast('✅ Adicionado ao carrinho!','success');
@@ -1272,10 +1272,11 @@ async function confirmarPedido(){
     // ETAPA 1: Validar estoque de TODOS os itens antes de gravar qualquer coisa
     const saldosAtuais=await api('estoque_saldo?select=id,produto_id,genero,tamanho,quantidade&perfil_codigo=eq.'+encodeURIComponent(PERFIL));
     for(const item of cart){
+      const itemProdId=parseInt(item.id||item.prodId);
       const saldo=(saldosAtuais||[]).find(s=>
-        s.produto_id===item.id&&
-        (s.genero||'')===(item.genero||'')&&
-        (s.tamanho||'')===(item.tamanho||'')
+        parseInt(s.produto_id)===itemProdId&&
+        (s.genero||'').toLowerCase().trim()===(item.genero||'').toLowerCase().trim()&&
+        (s.tamanho||'').trim()===(item.tamanho||'').trim()
       );
       const qtdDisp=saldo?parseFloat(saldo.quantidade||0):0;
       if(qtdDisp<item.qty){
@@ -1327,10 +1328,11 @@ async function confirmarPedido(){
         pagamento_confirmado:false
       })});
       // Atualizar estoque (abater quantidade)
+      const itemProdId2=parseInt(item.id||item.prodId);
       const saldo=(saldosAtuais||[]).find(s=>
-        s.produto_id===item.id&&
-        (s.genero||'')===(item.genero||'')&&
-        (s.tamanho||'')===(item.tamanho||'')
+        parseInt(s.produto_id)===itemProdId2&&
+        (s.genero||'').toLowerCase().trim()===(item.genero||'').toLowerCase().trim()&&
+        (s.tamanho||'').trim()===(item.tamanho||'').trim()
       );
       if(saldo){
         const novoSaldo=parseFloat(saldo.quantidade||0)-item.qty;
@@ -1341,7 +1343,7 @@ async function confirmarPedido(){
         // Registrar movimentação de estoque
         await api('estoque_movimentos',{method:'POST',body:JSON.stringify({
           perfil_codigo:PERFIL,
-          produto_id:item.id,
+          produto_id:parseInt(item.id||item.prodId),
           tipo:'saida',
           quantidade:item.qty,
           quantidade_anterior:parseFloat(saldo.quantidade||0),
