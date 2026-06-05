@@ -345,14 +345,12 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   /* Produto detail no mobile: empilha verticalmente */
   .product-detail{display:flex;flex-direction:column;overflow:visible;flex:none;}
   .product-detail-img{width:100%;overflow:hidden;flex-shrink:0;background:#f0f0f0;}
-
-  /* padding-bottom:100% = quadrado garantido, sem depender de flex height */
   .product-detail-img .main-img-wrap{
-    position:relative;
     width:100%;
-    padding-bottom:90%;  /* 90% da largura = altura */
-    flex:none;
-    height:0;
+    /* altura setada por JS via fixImgWrapHeight() */
+    position:relative;
+    overflow:hidden;
+    background:#f0f0f0;
   }
   .product-detail-img .main-img-wrap img{
     position:absolute;
@@ -363,7 +361,6 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
     padding:16px;
     display:block;
   }
-
   .product-detail-info{padding:20px 16px;overflow-y:visible;}
   .product-detail-info h2{font-size:22px;}
   .product-detail-price{font-size:30px;}
@@ -390,7 +387,7 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   .btn-icon{width:36px;height:36px;font-size:16px;}
   .hero h1{font-size:clamp(38px,13vw,60px);}
   .product-grid{grid-template-columns:1fr 1fr;gap:10px;}
-  .product-detail-img .main-img-wrap{padding-bottom:90%;}
+  .product-detail-info h2{font-size:20px;}
   .product-detail-info h2{font-size:20px;}
   .about-features{grid-template-columns:1fr;}
   .hero-cta{flex-direction:column;align-items:center;}
@@ -881,7 +878,7 @@ async function openProduct(id, updateUrl=true){
     :`<span style="font-size:80px;opacity:.3;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)">👔</span>`;
   content.innerHTML=`
     <div class="product-detail-img">
-      <div class="main-img-wrap">
+      <div class="main-img-wrap" id="main-img-wrap">
         ${mainImgHtml}
       </div>
       ${thumbsRow}
@@ -910,13 +907,18 @@ async function openProduct(id, updateUrl=true){
     </div>`;
   modal.classList.add('open');
   document.getElementById('backdrop').classList.add('show');
-  // Força reflow: sem isso, na segunda abertura o browser usa dimensões cacheadas
-  const wrap = content.querySelector('.main-img-wrap');
-  if(wrap){
-    wrap.style.display='none';
-    void wrap.offsetHeight; // lê propriedade para forçar reflow síncrono
-    wrap.style.display='';
-  }
+  fixImgWrapHeight();
+}
+
+function fixImgWrapHeight(){
+  // Só aplica no mobile
+  if(window.innerWidth > 768) return;
+  const wrap = document.getElementById('main-img-wrap');
+  if(!wrap) return;
+  // Altura = largura da tela (quadrado), já que wrap tem width:100%
+  const w = wrap.getBoundingClientRect().width || window.innerWidth;
+  wrap.style.height = w + 'px';
+  wrap.style.paddingBottom = '0';
 }
 
 function setMainImg(thumbEl, src){
