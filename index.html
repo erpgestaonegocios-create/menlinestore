@@ -806,11 +806,12 @@ async function loadProducts(){
       p._estoque=p._saldos.reduce((s,r)=>s+parseFloat(r.quantidade||0),0);
     });
     renderFeatured();
-    renderAllProducts();
-    buildCategoryFilters();
-    // Se a seção produtos já estava visível antes de carregar, renderiza agora
-    const secProd=document.getElementById('section-produtos');
-    if(secProd&&secProd.style.display!=='none'){renderAllProducts();buildCategoryFilters();}
+    // Se o usuário tentou ir para produtos antes de carregar, renderiza agora
+    if(window._pendingRenderProdutos){
+      window._pendingRenderProdutos=false;
+      renderAllProducts();
+      buildCategoryFilters();
+    }
   }catch(e){
     console.error('Erro ao carregar produtos:',e);
     document.getElementById('featured-grid').innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="icon">😕</div><h3>Não foi possível carregar os produtos</h3></div>';
@@ -1438,9 +1439,10 @@ function showSection(name,scroll=true){
     document.querySelectorAll('nav a')[idx].classList.add('active');
   if(name==='produtos'){
     if(allProducts.length===0){
-      // Produtos ainda carregando — mostra spinner e aguarda
+      // Produtos ainda carregando — mostra spinner e seta flag para renderizar quando carregar
       const grid=document.getElementById('all-products-grid');
       if(grid)grid.innerHTML='<div class="loading-center" style="grid-column:1/-1"><div class="spinner"></div><p style="margin-top:12px;color:var(--text3)">Carregando produtos...</p></div>';
+      window._pendingRenderProdutos=true;
     } else {
       renderAllProducts();
       buildCategoryFilters();
