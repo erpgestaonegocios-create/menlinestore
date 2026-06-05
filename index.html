@@ -538,7 +538,7 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
     <div class="filters">
       <div class="search-bar">
         <span>🔍</span>
-        <input type="text" id="search-input" placeholder="Buscar produto..." oninput="filterProducts()">
+        <input type="text" id="search-input" placeholder="Buscar produto..." oninput="filterProducts()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       </div>
       <button class="filter-btn active" onclick="setFilter('todos',this)">Todos</button>
       <div id="cat-filters"></div>
@@ -772,6 +772,9 @@ window.addEventListener('DOMContentLoaded',()=>{
   // Set logo
   const logoB64=LOGO_BASE64;
   document.querySelectorAll('.logo-img,[id$="-logo"]').forEach(el=>el.src=logoB64);
+  // Limpar campo de busca (evitar autocomplete do browser)
+  const si=document.getElementById('search-input');
+  if(si)si.value='';
   renderCart();
   updateUserUI();
   rotear(); // interpreta o hash inicial
@@ -887,11 +890,15 @@ function renderAllProducts(){
 
 // ── PRODUCT DETAIL ───────────────────────────────────────────────
 async function openProduct(id, updateUrl=true){
-  const p=allProducts.find(x=>x.id===id);
-  if(!p)return;
-  currentProductId=id;
+  const idNum=parseInt(id);
+  const p=allProducts.find(x=>parseInt(x.id)===idNum);
+  if(!p){
+    console.warn('openProduct: produto não encontrado. id='+id+' tipo='+typeof id+' allProducts.length='+allProducts.length);
+    return;
+  }
+  currentProductId=idNum;
   selectedSize=null;selectedGenero=null;selectedQty=1;
-  if(updateUrl) location.hash='produto-'+id;
+  if(updateUrl) location.hash='produto-'+idNum;
   const modal=document.getElementById('product-modal');
   const content=document.getElementById('product-detail-content');
   // Get all images
@@ -1674,19 +1681,16 @@ function rotear(){
   if(hash.startsWith('produto-')){
     const id=parseInt(hash.replace('produto-',''));
     if(!isNaN(id)){
-      // Mostrar seção produtos sem renderizar o grid (modal vai abrir por cima)
+      // Mostrar seção produtos sem re-renderizar o grid
       document.querySelectorAll('[id^="section-"]').forEach(s=>{s.style.display='none';});
       const secProd=document.getElementById('section-produtos');
       if(secProd)secProd.style.display='block';
       // Aguarda produtos carregarem se ainda não carregaram
       const tentativa=()=>{
-        const p=allProducts.find(x=>x.id===id);
+        const p=allProducts.find(x=>parseInt(x.id)===id);
         if(p){openProduct(id,false);}
         else if(allProducts.length===0){setTimeout(tentativa,200);}
-        else{
-          // Produto não encontrado — volta para o grid
-          showSection('produtos',false);
-        }
+        // se produtos carregaram mas não achou, não faz nada (modal já aberto)
       };
       tentativa();
     }
@@ -1721,6 +1725,8 @@ function closeModal(id){
   document.getElementById('backdrop').classList.remove('show');
     // Se fechou o modal de produto, volta o hash para a seção atual
   if(id==='product-modal'&&location.hash.startsWith('#produto-')){
+    // Renderizar grid antes de mudar hash para evitar flash de "não encontrado"
+    if(allProducts.length>0){renderAllProducts();buildCategoryFilters();}
     location.hash='produtos';
   }
 }
