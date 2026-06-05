@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Men Line Store — Moda Masculina em Contagem-MG</title>
 <meta name="description" content="Men Line Store: moda masculina premium em Contagem-MG. Camisas, calças, acessórios e muito mais. Compre online com entrega para todo o Brasil.">
+<meta name="facebook-domain-verification" content="6wpjrcfdt134f6lrq16ifuy0nmur99" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
 <style>
@@ -447,6 +448,20 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   </div>
 </header>
 
+
+<!-- MEUS PEDIDOS MODAL -->
+<div class="modal-overlay" id="meus-pedidos-modal">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-header">
+      <span style="font-size:16px;font-weight:700">📦 Meus Pedidos</span>
+      <button class="modal-close" onclick="closeModal('meus-pedidos-modal')">×</button>
+    </div>
+    <div class="modal-body" style="padding:20px" id="meus-pedidos-conteudo">
+      <div class="loading-center"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
 <!-- BACKDROP -->
 <div class="backdrop" id="backdrop" onclick="closeAll()"></div>
 
@@ -653,7 +668,11 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
             <div class="form-group"><label>Senha</label><input type="password" id="reg-senha" placeholder="Mínimo 6 caracteres"></div>
             <div class="form-group"><label>CEP</label><input type="text" id="reg-cep" placeholder="00000-000" oninput="buscarCepReg(this.value)"></div>
           </div>
-          <div class="form-group"><label>Endereço</label><input type="text" id="reg-end" placeholder="Rua, número, complemento"></div>
+          <div class="form-group"><label>Endereço</label><input type="text" id="reg-end" placeholder="Rua, avenida..."></div>
+          <div class="form-grid">
+            <div class="form-group"><label>Número</label><input type="text" id="reg-num" placeholder="Ex: 123"></div>
+            <div class="form-group"><label>Complemento</label><input type="text" id="reg-comp" placeholder="Apto, bloco... (opcional)"></div>
+          </div>
           <div class="form-grid">
             <div class="form-group"><label>Cidade</label><input type="text" id="reg-cidade" placeholder="Sua cidade"></div>
             <div class="form-group"><label>Estado</label><input type="text" id="reg-uf" placeholder="MG" maxlength="2"></div>
@@ -670,6 +689,7 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
           <div style="font-size:13px;color:var(--text3);margin-top:4px" id="user-email-display"></div>
         </div>
         <button class="btn-secondary" style="width:100%;margin-bottom:10px" onclick="showSection('produtos');closeModal('auth-modal')">Ver produtos</button>
+        <button class="btn-secondary" style="width:100%;margin-bottom:10px" onclick="abrirMeusPedidos()">📦 Meus Pedidos</button>
         <button class="btn-secondary" style="width:100%;color:var(--danger);border-color:var(--danger)" onclick="fazerLogout()">Sair</button>
       </div>
     </div>
@@ -788,6 +808,9 @@ async function loadProducts(){
     renderFeatured();
     renderAllProducts();
     buildCategoryFilters();
+    // Se a seção produtos já estava visível antes de carregar, renderiza agora
+    const secProd=document.getElementById('section-produtos');
+    if(secProd&&secProd.style.display!=='none'){renderAllProducts();buildCategoryFilters();}
   }catch(e){
     console.error('Erro ao carregar produtos:',e);
     document.getElementById('featured-grid').innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="icon">😕</div><h3>Não foi possível carregar os produtos</h3></div>';
@@ -851,6 +874,8 @@ function renderAllProducts(){
 async function openProduct(id, updateUrl=true){
   const p=allProducts.find(x=>x.id===id);
   if(!p)return;
+  currentProductId=id;
+  selectedSize=null;selectedGenero=null;selectedQty=1;
   if(updateUrl) location.hash='produto-'+id;
   const modal=document.getElementById('product-modal');
   const content=document.getElementById('product-detail-content');
@@ -936,6 +961,7 @@ function setMainImg(thumbEl, src){
 let selectedSize=null;
 let selectedGenero=null;
 let selectedQty=1;
+let currentProductId=null;
 
 function selectSize(btn,size){
   document.querySelectorAll('#size-btns .size-btn').forEach(b=>b.classList.remove('selected'));
@@ -948,15 +974,57 @@ function selectGenero(btn,genero){
   selectedGenero=genero;
 }
 function changeQty(delta){
+  if(delta>0){
+    // Verificar estoque disponível para a combinação selecionada
+    const p=allProducts.find(x=>x.id===currentProductId);
+    if(p){
+      const saldo=p._saldos.find(s=>
+        (!selectedGenero||s.genero===selectedGenero)&&
+        (!selectedSize||s.tamanho===selectedSize)
+      );
+      const maxEstoque=saldo?parseFloat(saldo.quantidade||0):0;
+      // Descontar o que já está no carrinho para esse item
+      const key=`${currentProductId}_${selectedGenero||''}_${selectedSize||''}`;
+      const noCarrinho=cart.find(i=>i.key===key);
+      const qtdNoCarrinho=noCarrinho?noCarrinho.qty:0;
+      const disponivel=maxEstoque-qtdNoCarrinho;
+      if(selectedQty+delta>disponivel){
+        const msgEl=document.getElementById('detail-stock');
+        if(msgEl){
+          msgEl.innerHTML=`<span style="color:var(--danger)">⚠️ Disponível: apenas ${Math.max(0,disponivel)} unidade${disponivel===1?'':'s'}${selectedSize?' (tam. '+selectedSize+')':''}${selectedGenero?' · '+selectedGenero:''}</span>`;
+        }
+        return;
+      }
+    }
+  }
   selectedQty=Math.max(1,selectedQty+delta);
   document.getElementById('detail-qty').textContent=selectedQty;
+  // Limpa msg de estoque se diminuiu
+  if(delta<0){
+    const msgEl=document.getElementById('detail-stock');
+    const p=allProducts.find(x=>x.id===currentProductId);
+    if(msgEl&&p){msgEl.innerHTML='✓ Disponível em estoque';}
+  }
 }
 
 // ── CART ────────────────────────────────────────────────────────
 function addToCart(prodId){
   const p=allProducts.find(x=>x.id===prodId);if(!p)return;
   const key=`${prodId}_${selectedGenero||''}_${selectedSize||''}`;
+  // Validar estoque antes de adicionar
+  const saldo=p._saldos.find(s=>
+    (!selectedGenero||s.genero===selectedGenero)&&
+    (!selectedSize||s.tamanho===selectedSize)
+  );
+  const maxEstoque=saldo?parseFloat(saldo.quantidade||0):0;
   const existing=cart.find(i=>i.key===key);
+  const qtdNoCarrinho=existing?existing.qty:0;
+  if(selectedQty+qtdNoCarrinho>maxEstoque){
+    const disponivel=Math.max(0,maxEstoque-qtdNoCarrinho);
+    const msgEl=document.getElementById('detail-stock');
+    if(msgEl)msgEl.innerHTML=`<span style="color:var(--danger)">⚠️ Disponível: apenas ${disponivel} unidade${disponivel===1?'':'s'}${selectedSize?' (tam. '+selectedSize+')':''}${selectedGenero?' · '+selectedGenero:''}</span>`;
+    return;
+  }
   if(existing){existing.qty+=selectedQty;}
   else{cart.push({key,prodId,nome:p.nome,preco:parseFloat(p.preco_venda||0),genero:selectedGenero,tamanho:selectedSize,qty:selectedQty,img:p.imagem_base64||''});}
   saveCart();renderCart();
@@ -1008,8 +1076,10 @@ function toggleCart(){
 
 // ── CHECKOUT ────────────────────────────────────────────────────
 let pendingCheckout=false;
+let selectedEntrega='correios';
 function openCheckout(){
   if(!cart.length){toast('Carrinho vazio!','error');return;}
+  selectedEntrega='correios'; // reset a cada abertura
   document.getElementById('cart-sidebar').classList.remove('open');
   // Se não estiver logado, abre auth e volta ao checkout após login/cadastro
   if(!currentUser){
@@ -1048,6 +1118,17 @@ function openCheckout(){
       </div>
     </div>
     <div style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Como deseja receber o produto?</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+        <button class="filter-btn active" id="entrega-correios" onclick="selectEntrega('correios',this)">📦 Correios</button>
+        <button class="filter-btn" id="entrega-retirada" onclick="selectEntrega('retirada',this)">🏪 Retirada</button>
+        <button class="filter-btn" id="entrega-app" onclick="selectEntrega('app',this)">🛵 Via App</button>
+      </div>
+      <div id="entrega-info" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text2)">
+        📦 <strong>Correios</strong> — Entrega em todo o Brasil com rastreamento.
+      </div>
+    </div>
+    <div style="margin-bottom:20px">
       <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Forma de pagamento</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
         <button class="filter-btn active" id="pay-pix" onclick="selectPay('pix',this)">⚡ PIX</button>
@@ -1066,6 +1147,18 @@ function openCheckout(){
 }
 
 let selectedPayment='pix';
+function selectEntrega(method, btn){
+  selectedEntrega=method;
+  document.querySelectorAll('#entrega-correios,#entrega-retirada,#entrega-app').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const infos={
+    'correios':'📦 <strong>Correios</strong> — Entrega em todo o Brasil com rastreamento.',
+    'retirada':'🏪 <strong>Retirada presencial</strong> — Rua Isaias José Diniz, 212. Europa — Contagem — MG.',
+    'app':'🛵 <strong>Via aplicativo</strong> — Você contrata o app de entrega (iFood, Rappi, etc.) por sua conta. Endereço de coleta: Rua Isaias José Diniz, 212. Europa — Contagem — MG.'
+  };
+  document.getElementById('entrega-info').innerHTML=infos[method]||'';
+}
+
 function selectPay(method,btn){
   selectedPayment=method;
   document.querySelectorAll('#checkout-body .filter-btn').forEach(b=>b.classList.remove('active'));
@@ -1140,16 +1233,26 @@ async function confirmarPedido(){
         observacoes:'GASTO_LOJA:💳 Taxa MP'
       })}).catch(()=>{});
     }
-    // 3. Gerar link WhatsApp
+    // 3. Salvar forma de entrega nas compras registradas
+    const entregaLabel={'correios':'Correios','retirada':'Retirada presencial','app':'Via aplicativo'}[selectedEntrega]||selectedEntrega;
+    // Atualizar forma_entrega nas compras do cliente (últimas registradas)
+    if(clienteId){
+      api('cliente_compras?cliente_id=eq.'+clienteId+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&order=id.desc&limit='+cart.length,
+        {method:'PATCH',body:JSON.stringify({forma_entrega:selectedEntrega})}).catch(()=>{});
+    }
+    // 4. Gerar link WhatsApp
     const itensTxtWA=cart.map(i=>`• ${i.nome}${i.genero?' '+i.genero:''}${i.tamanho?' Tam.'+i.tamanho:''} (${i.qty}x) — R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}`).join('\n');
-    const waMsg=encodeURIComponent(`Olá! Gostaria de confirmar meu pedido:\n\n${itensTxtWA}\n\nTotal: R$ ${total.toFixed(2).replace('.',',')}\n\nNome: ${nome}\nCEP: ${cep}\nEndereço: ${end}, ${cidade}-${uf}\nPagamento: ${selectedPayment.toUpperCase()}`);
-    // 3. Mostrar confirmação com PIX/pagamento
+    const waMsg=encodeURIComponent(`Olá! Gostaria de confirmar meu pedido:\n\n${itensTxtWA}\n\nTotal: R$ ${total.toFixed(2).replace('.',',')}\n\nNome: ${nome}\nCEP: ${cep}\nEndereço: ${end}, ${cidade}-${uf}\nPagamento: ${selectedPayment.toUpperCase()}\nEntrega: ${entregaLabel}`);
+    // 5. Mensagem de confirmação conforme forma de entrega
+    const msgEntrega = selectedEntrega==='correios'
+      ? 'Finalize o pagamento para confirmarmos seu pedido.'
+      : 'Seu pedido está sendo preparado e você será informado sobre os próximos passos para realizar a retirada.';
     const body=document.getElementById('checkout-body');
     body.innerHTML=`
       <div style="text-align:center;padding:16px 0 24px">
         <div style="font-size:56px;margin-bottom:12px">🎉</div>
         <h2 style="font-size:28px;margin-bottom:8px">Pedido recebido!</h2>
-        <p style="color:var(--text2);font-size:14px;max-width:380px;margin:0 auto">Finalize o pagamento para confirmarmos seu pedido.</p>
+        <p style="color:var(--text2);font-size:14px;max-width:380px;margin:0 auto">${msgEntrega}</p>
       </div>
       ${selectedPayment==='pix'?`
       <div class="pix-box">
@@ -1164,6 +1267,10 @@ async function confirmarPedido(){
         <button class="btn-secondary" onclick="cart=[];saveCart();renderCart();closeModal('checkout-modal');toast('✅ Pedido registrado!','success')">Fechar</button>
       </div>
     `;
+    // Disparar email de confirmação
+    try{
+      await emailPedidoRecebidoSite(nome, email, cart, total);
+    }catch(e){ console.error('email erro:',e); }
     cart=[];saveCart();renderCart();
   }catch(e){showMsg('Erro ao processar pedido: '+e.message,'error');}
 }
@@ -1191,6 +1298,9 @@ function openAuth(tab='login'){
   else{
     document.getElementById('auth-logged-out').style.display='block';
     document.getElementById('auth-logged-in').style.display='none';
+    // Limpa todos os campos e mensagens de erro
+    ['login-email','login-senha','reg-nome','reg-tel','reg-email','reg-senha','reg-cep','reg-end','reg-num','reg-comp','reg-cidade','reg-uf'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    ['login-msg','reg-msg'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.display='none';el.textContent='';}});
     authTab(tab);
   }
   document.getElementById('auth-modal').classList.add('open');
@@ -1228,6 +1338,8 @@ async function criarConta(){
   const senha=document.getElementById('reg-senha').value;
   const cep=document.getElementById('reg-cep').value.trim();
   const end=document.getElementById('reg-end').value.trim();
+  const num=document.getElementById('reg-num').value.trim();
+  const comp=document.getElementById('reg-comp').value.trim();
   const cidade=document.getElementById('reg-cidade').value.trim();
   const uf=document.getElementById('reg-uf').value.trim();
   const msg=document.getElementById('reg-msg');
@@ -1237,7 +1349,7 @@ async function criarConta(){
   try{
     const exist=await api('clientes?email=eq.'+encodeURIComponent(email)+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&select=id');
     if(exist&&exist.length){showMsg('Este e-mail já está cadastrado.','error');return;}
-    const novo=await api('clientes',{method:'POST',body:JSON.stringify({perfil_codigo:PERFIL,nome,email,telefone:tel,cep,endereco:end,cidade,estado:uf,senha_hash:senha,ativo:true,origem:'site'})});
+    const novo=await api('clientes',{method:'POST',body:JSON.stringify({perfil_codigo:PERFIL,nome,email,telefone:tel,cep,endereco:end,numero:num,complemento:comp,cidade,estado:uf,senha_hash:senha,ativo:true})});
     currentUser=(novo&&novo[0])?novo[0]:{nome,email};
     localStorage.setItem('mls_user',JSON.stringify(currentUser));
     updateUserUI();closeModal('auth-modal');
@@ -1324,7 +1436,16 @@ function showSection(name,scroll=true){
   const idx={home:0,produtos:1,sobre:2,contato:3}[name];
   if(idx!==undefined&&document.querySelectorAll('nav a')[idx])
     document.querySelectorAll('nav a')[idx].classList.add('active');
-  if(name==='produtos'){renderAllProducts();buildCategoryFilters();}
+  if(name==='produtos'){
+    if(allProducts.length===0){
+      // Produtos ainda carregando — mostra spinner e aguarda
+      const grid=document.getElementById('all-products-grid');
+      if(grid)grid.innerHTML='<div class="loading-center" style="grid-column:1/-1"><div class="spinner"></div><p style="margin-top:12px;color:var(--text3)">Carregando produtos...</p></div>';
+    } else {
+      renderAllProducts();
+      buildCategoryFilters();
+    }
+  }
 }
 
 // Interpreta o hash atual e mostra a seção/produto correto
@@ -1391,6 +1512,92 @@ function toast(msg,type='success'){
   clearTimeout(el._t);
   el._t=setTimeout(()=>el.classList.remove('show'),3200);
 }
+
+// ── MEUS PEDIDOS ─────────────────────────────────────────────────
+async function abrirMeusPedidos(){
+  if(!currentUser){openAuth();return;}
+  closeModal('auth-modal');
+  document.getElementById('meus-pedidos-modal').classList.add('open');
+  document.getElementById('backdrop').classList.add('show');
+  document.body.style.overflowY='hidden';
+  const wrap=document.getElementById('meus-pedidos-conteudo');
+  wrap.innerHTML='<div class="loading-center"><div class="spinner"></div></div>';
+  try{
+    const compras=await api('cliente_compras?select=*,produtos(nome)&cliente_id=eq.'+currentUser.id+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&order=data_compra.desc,id.desc');
+    if(!compras||!compras.length){
+      wrap.innerHTML='<div class="empty-state"><div class="icon">📦</div><h3>Nenhum pedido encontrado</h3><p style="font-size:13px;margin-top:8px">Você ainda não realizou nenhuma compra.</p></div>';
+      return;
+    }
+    const fmtD=d=>d?new Date(d+'T12:00').toLocaleDateString('pt-BR'):'-';
+    const fmtV=v=>'R$ '+parseFloat(v||0).toFixed(2).replace('.',',');
+    const statusInfo={
+      'pendente':{label:'⏳ Processando',color:'var(--gold)'},
+      'postado':{label:'📦 Postado',color:'var(--accent2)'},
+      'pronto_retirada':{label:'🏪 Pronto p/ Retirada',color:'var(--success)'},
+      'entregue':{label:'✅ Entregue',color:'var(--success)'}
+    };
+    let html=compras.map(c=>{
+      const st=statusInfo[c.status_entrega||'pendente']||statusInfo['pendente'];
+      const rastreioHtml=c.codigo_rastreio?`
+        <div style="margin-top:12px;padding:12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Código de Rastreamento</div>
+          <div style="font-size:18px;font-weight:700;color:var(--accent2);letter-spacing:2px;margin-bottom:10px">${c.codigo_rastreio}</div>
+          <a href="https://rastreamento.correios.com.br/app/index.php?objetos=${c.codigo_rastreio}" target="_blank" class="btn-primary" style="display:inline-block;padding:10px 20px;font-size:13px;text-decoration:none">🔍 Rastrear nos Correios</a>
+        </div>`:'';
+      return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--text)">${c.produtos?.nome||'Produto'}</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px">${[c.genero,c.tamanho].filter(Boolean).join(' · ')} · ${fmtD(c.data_compra)}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:18px;font-weight:700;color:var(--white)">${fmtV(c.total_pago)}</div>
+            <div style="font-size:12px;font-weight:600;color:${st.color};margin-top:2px">${st.label}</div>
+          </div>
+        </div>
+        ${rastreioHtml}
+      </div>`;
+    }).join('');
+    wrap.innerHTML=html;
+  }catch(e){wrap.innerHTML='<div class="empty-state"><p style="color:var(--danger)">Erro ao carregar pedidos.</p></div>';}
+}
+
+
+// ── EMAIL via Resend ─────────────────────────────────────────────
+const RESEND_KEY='re_izhU8uCt_NUtfqRdmxJDfogqAhPcYCbws';
+let _emailTpls={};
+
+async function carregarTemplates(){
+  if(Object.keys(_emailTpls).length)return;
+  try{
+    const rows=await api('email_templates?perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&ativo=eq.true&select=tipo,assunto,corpo_html');
+    (rows||[]).forEach(r=>{_emailTpls[r.tipo]=r;});
+  }catch(e){console.error('templates:',e);}
+}
+
+function aplicarVars(texto,vars){
+  return texto.replace(/\{\{(\w+)\}\}/g,(m,k)=>vars[k]!==undefined?vars[k]:m);
+}
+
+async function dispararEmail(para,assunto,html){
+  try{
+    await fetch('https://api.resend.com/emails',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+RESEND_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({from:'Men Line Store <pedidos@menlinestore.com.br>',to:[para],subject:assunto,html:html})
+    });
+  }catch(e){console.error('email:',e);}
+}
+
+async function emailPedidoRecebidoSite(nomeCliente,emailCliente,itens,total){
+  await carregarTemplates();
+  const tpl=_emailTpls['pedido_recebido'];
+  if(!tpl)return;
+  const itensHtml=itens.map(i=>`<tr><td style="padding:8px;border-bottom:1px solid #eee">${i.nome}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.genero||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.tamanho||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.qty}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</td></tr>`).join('');
+  const vars={nome_cliente:nomeCliente,itens_tabela:itensHtml,total_pedido:'R$ '+parseFloat(total).toFixed(2).replace('.',',')};
+  return dispararEmail(emailCliente,aplicarVars(tpl.assunto,vars),aplicarVars(tpl.corpo_html,vars));
+}
+
 </script>
 </body>
 </html>
