@@ -1069,6 +1069,32 @@ function addToCart(prodId){
   selectedSize=null;selectedGenero=null;selectedQty=1;
 }
 
+function cartChangeQty(key, delta){
+  const item=cart.find(i=>i.key===key);
+  if(!item)return;
+  const novaQty=item.qty+delta;
+  if(novaQty<=0){
+    // Confirmar remoção
+    cart=cart.filter(i=>i.key!==key);
+  } else {
+    // Validar estoque máximo
+    const p=allProducts.find(x=>parseInt(x.id)===parseInt(item.id||item.prodId));
+    if(p&&delta>0){
+      const saldo=p._saldos.find(s=>
+        (s.genero||'').toLowerCase().trim()===(item.genero||'').toLowerCase().trim()&&
+        (s.tamanho||'').trim()===(item.tamanho||'').trim()
+      );
+      const maxEstoque=saldo?parseFloat(saldo.quantidade||0):0;
+      if(novaQty>maxEstoque){
+        toast(`⚠️ Disponível: apenas ${maxEstoque} unidade${maxEstoque===1?'':'s'}`,'error');
+        return;
+      }
+    }
+    item.qty=novaQty;
+  }
+  saveCart();renderCart();
+}
+
 function removeFromCart(key){
   cart=cart.filter(i=>i.key!==key);
   saveCart();renderCart();
@@ -1095,10 +1121,15 @@ function renderCart(){
       <div class="cart-item-img">${i.img?`<img src="${i.img}" alt="${i.nome}">`:'<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:28px;opacity:.3">👔</div>'}</div>
       <div class="cart-item-info">
         <div class="cart-item-name">${i.nome}</div>
-        <div class="cart-item-var">${[i.genero,i.tamanho].filter(Boolean).join(' · ')} · Qtd: ${i.qty}</div>
-        <div class="cart-item-price">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</div>
+        <div class="cart-item-var">${[i.genero,i.tamanho].filter(Boolean).join(' · ')}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+          <button onclick="cartChangeQty('${i.key}',-1)" style="width:26px;height:26px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">−</button>
+          <span style="font-size:13px;font-weight:600;min-width:20px;text-align:center">${i.qty}</span>
+          <button onclick="cartChangeQty('${i.key}',1)" style="width:26px;height:26px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
+          <div class="cart-item-price" style="margin-left:4px">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</div>
+        </div>
       </div>
-      <button class="cart-item-remove" onclick="removeFromCart('${i.key}')">×</button>
+      <button class="cart-item-remove" onclick="removeFromCart('${i.key}')" title="Remover item">×</button>
     </div>`).join('');
   document.getElementById('cart-total-val').textContent='R$ '+total.toFixed(2).replace('.',',');
   footer.style.display='block';
