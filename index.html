@@ -331,11 +331,11 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   .product-price{font-size:18px;}
 
   /* Modal produto no mobile: tela cheia */
-  .modal-overlay{align-items:flex-end;padding:0;}
+  .modal-overlay{align-items:center;padding:0;}
   .modal-box{
-    margin:0;border-radius:16px 16px 0 0;
+    margin:0;border-radius:16px;
     max-height:95vh;height:95vh;
-    position:fixed;bottom:0;left:0;right:0;
+    position:relative;
     max-width:100%!important;
     display:flex;flex-direction:column;
   }
@@ -902,29 +902,18 @@ async function openProduct(id, updateUrl=true){
         🚚 Frete calculado no checkout · 🔒 Pagamento seguro · 📦 Embalagem caprichada
       </div>
     </div>`;
-  // Reseta scroll do modal ANTES de abrir
+  // Congela a página exatamente onde está, sem nenhum salto
+  const scrollY=window.scrollY;
+  document.body.style.position='fixed';
+  document.body.style.top=-scrollY+'px';
+  document.body.style.left='0';
+  document.body.style.right='0';
+  document.body.style.overflow='hidden';
+  // Abre o modal com scroll interno zerado
   const modalBody=document.querySelector('#product-modal .modal-body');
   if(modalBody) modalBody.scrollTop=0;
   modal.classList.add('open');
   document.getElementById('backdrop').classList.add('show');
-  const scrollW=window.innerWidth-document.documentElement.clientWidth;
-  document.body.style.overflow='hidden';
-  document.body.style.paddingRight=scrollW+'px';
-  // Aplica altura da imagem depois do modal estar visível
-  requestAnimationFrame(()=>{
-    requestAnimationFrame(()=>{
-      const img=document.getElementById('detail-main-img');
-      if(img && window.innerWidth<=768){
-        const h=Math.min(window.innerWidth*0.8,340);
-        img.style.height=h+'px';
-        img.style.width='100%';
-        img.style.objectFit='contain';
-        img.style.display='block';
-        img.style.padding='12px';
-      }
-      if(modalBody) modalBody.scrollTop=0;
-    });
-  });
 }
 
 function setMainImg(thumbEl, src){
@@ -1366,7 +1355,13 @@ function setSearch(){setTimeout(()=>document.getElementById('search-input')?.foc
 function closeModal(id){
   document.getElementById(id).classList.remove('open');
   document.getElementById('backdrop').classList.remove('show');
+  const scrollY=parseInt(document.body.style.top||'0')*-1;
+  document.body.style.position='';
+  document.body.style.top='';
+  document.body.style.left='';
+  document.body.style.right='';
   document.body.style.overflow='';
+  window.scrollTo(0,scrollY);
   // Se fechou o modal de produto, volta o hash para a seção atual
   if(id==='product-modal'&&location.hash.startsWith('#produto-')){
     location.hash='produtos';
@@ -1376,8 +1371,13 @@ function closeAll(){
   document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));
   document.getElementById('cart-sidebar').classList.remove('open');
   document.getElementById('backdrop').classList.remove('show');
+  const scrollY=parseInt(document.body.style.top||'0')*-1;
+  document.body.style.position='';
+  document.body.style.top='';
+  document.body.style.left='';
+  document.body.style.right='';
   document.body.style.overflow='';
-  document.body.style.paddingRight='';
+  window.scrollTo(0,scrollY);
 }
 
 
