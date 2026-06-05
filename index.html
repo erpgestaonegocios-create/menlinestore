@@ -904,8 +904,13 @@ async function openProduct(id, updateUrl=true){
     </div>`;
   modal.classList.add('open');
   document.getElementById('backdrop').classList.add('show');
+  const scrollW=window.innerWidth-document.documentElement.clientWidth;
   document.body.style.overflow='hidden';
+  document.body.style.paddingRight=scrollW+'px';
   setTimeout(()=>{
+    // Rola modal para o topo para garantir que imagem aparece completa
+    const modalBody=document.querySelector('#product-modal .modal-body');
+    if(modalBody) modalBody.scrollTop=0;
     const img=document.getElementById('detail-main-img');
     if(img && window.innerWidth<=768){
       const h=Math.min(window.innerWidth*0.8,340);
@@ -1368,6 +1373,7 @@ function closeAll(){
   document.getElementById('cart-sidebar').classList.remove('open');
   document.getElementById('backdrop').classList.remove('show');
   document.body.style.overflow='';
+  document.body.style.paddingRight='';
 }
 
 
