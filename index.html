@@ -1357,7 +1357,7 @@ async function fazerLogin(){
     if(!emailRows||!emailRows.length){
       // Email não cadastrado — redirecionar para criar conta com countdown
       let sec=3;
-      showMsg(`Você ainda não tem cadastro. Redirecionando para criar conta em <strong>${sec}s</strong>...`,'error');
+      showMsg(`Você ainda não tem cadastro. Redirecionando para criar conta em <strong>${sec}s</strong>...`,'success');
       const timer=setInterval(()=>{
         sec--;
         if(sec<=0){
@@ -1368,7 +1368,7 @@ async function fazerLogin(){
           if(regEmail)regEmail.value=email;
           msg.style.display='none';
         } else {
-          showMsg(`Você ainda não tem cadastro. Redirecionando para criar conta em <strong>${sec}s</strong>...`,'error');
+          showMsg(`Você ainda não tem cadastro. Redirecionando para criar conta em <strong>${sec}s</strong>...`,'success');
         }
       },1000);
       return;
