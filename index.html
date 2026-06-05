@@ -1439,6 +1439,14 @@ async function confirmarPedido(){
         <button class="btn-secondary" onclick="cart=[];saveCart();renderCart();closeModal('checkout-modal');">Fechar</button>
       </div>
     `;
+    // Recarregar saldos de estoque em memória (reflete compra atual)
+    try{
+      const saldosAtt=await api('estoque_saldo?select=produto_id,genero,tamanho,quantidade&perfil_codigo=eq.'+encodeURIComponent(PERFIL));
+      allProducts.forEach(p=>{
+        p._saldos=(saldosAtt||[]).filter(s=>parseInt(s.produto_id)===parseInt(p.id));
+        p._estoque=p._saldos.reduce((s,r)=>s+parseFloat(r.quantidade||0),0);
+      });
+    }catch(e){ console.warn('Erro ao atualizar saldos:',e); }
     // Disparar email de confirmação ao cliente
     try{
       await emailPedidoRecebidoSite(nome, email, cart, total);
