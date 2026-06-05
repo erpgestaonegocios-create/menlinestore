@@ -1854,11 +1854,14 @@ function aplicarVars(texto,vars){
 
 async function dispararEmail(para,assunto,html){
   try{
-    const res=await fetch('https://api.resend.com/emails',{
+    const res=await fetch('https://uqigoyedyaltwjmfysnu.supabase.co/functions/v1/resend-email',{
       method:'POST',
-      mode:'cors',
-      headers:{'Authorization':'Bearer '+RESEND_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({from:'Men Line Store <pedidos@menlinestore.com.br>',to:[para],subject:assunto,html:html})
+      headers:{
+        'Content-Type':'application/json',
+        'apikey':SUPA_KEY,
+        'Authorization':'Bearer '+SUPA_KEY
+      },
+      body:JSON.stringify({to:[para],subject:assunto,html:html})
     });
     const data=await res.json().catch(()=>({}));
     if(!res.ok) console.error('Resend erro:',res.status,data);
