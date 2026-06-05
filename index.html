@@ -1296,13 +1296,22 @@ async function confirmarPedido(){
         observacoes:'GASTO_LOJA:💳 Taxa MP'
       })}).catch(()=>{});
     }
-    // 3. Salvar forma de entrega nas compras registradas
+    // 3. Inserir cada item do carrinho em cliente_compras
     const entregaLabel={'correios':'Correios','retirada':'Retirada presencial','app':'Via aplicativo'}[selectedEntrega]||selectedEntrega;
-    // Atualizar forma_entrega nas compras do cliente (últimas registradas)
     if(clienteId){
-      api('cliente_compras?cliente_id=eq.'+clienteId+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&order=id.desc&limit='+cart.length,
-        {method:'PATCH',body:JSON.stringify({
+      for(const item of cart){
+        await api('cliente_compras',{method:'POST',body:JSON.stringify({
+          perfil_codigo:PERFIL,
+          cliente_id:clienteId,
+          produto_id:item.id||null,
+          quantidade:item.qty,
+          valor_unitario:item.preco,
+          total_pago:parseFloat((item.preco*item.qty).toFixed(2)),
+          data_compra:today,
+          genero:item.genero||null,
+          tamanho:item.tamanho||null,
           forma_entrega:selectedEntrega,
+          forma_pagamento:selectedPayment,
           endereco_entrega:end,
           numero_entrega:num||null,
           complemento_entrega:comp||null,
@@ -1310,8 +1319,10 @@ async function confirmarPedido(){
           cidade_entrega:cidade,
           estado_entrega:uf,
           cep_entrega:cep,
-          forma_pagamento:selectedPayment
-        })}).catch(()=>{});
+          status_entrega:'pendente',
+          pagamento_confirmado:false
+        })}).catch(e=>console.error('Erro ao salvar compra:',e));
+      }
     }
     // 4. Gerar link WhatsApp
     const itensTxtWA=cart.map(i=>`• ${i.nome}${i.genero?' '+i.genero:''}${i.tamanho?' Tam.'+i.tamanho:''} (${i.qty}x) — R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}`).join('\n');
@@ -1740,12 +1751,16 @@ function aplicarVars(texto,vars){
 
 async function dispararEmail(para,assunto,html){
   try{
-    await fetch('https://api.resend.com/emails',{
+    const res=await fetch('https://api.resend.com/emails',{
       method:'POST',
+      mode:'cors',
       headers:{'Authorization':'Bearer '+RESEND_KEY,'Content-Type':'application/json'},
       body:JSON.stringify({from:'Men Line Store <pedidos@menlinestore.com.br>',to:[para],subject:assunto,html:html})
     });
-  }catch(e){console.error('email:',e);}
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok) console.error('Resend erro:',res.status,data);
+    else console.log('Email enviado:',data.id||'ok');
+  }catch(e){console.error('email erro:',e);}
 }
 
 async function emailPedidoRecebidoSite(nomeCliente,emailCliente,itens,total){
