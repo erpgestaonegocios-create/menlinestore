@@ -902,25 +902,29 @@ async function openProduct(id, updateUrl=true){
         🚚 Frete calculado no checkout · 🔒 Pagamento seguro · 📦 Embalagem caprichada
       </div>
     </div>`;
+  // Reseta scroll do modal ANTES de abrir
+  const modalBody=document.querySelector('#product-modal .modal-body');
+  if(modalBody) modalBody.scrollTop=0;
   modal.classList.add('open');
   document.getElementById('backdrop').classList.add('show');
   const scrollW=window.innerWidth-document.documentElement.clientWidth;
   document.body.style.overflow='hidden';
   document.body.style.paddingRight=scrollW+'px';
-  setTimeout(()=>{
-    // Rola modal para o topo para garantir que imagem aparece completa
-    const modalBody=document.querySelector('#product-modal .modal-body');
-    if(modalBody) modalBody.scrollTop=0;
-    const img=document.getElementById('detail-main-img');
-    if(img && window.innerWidth<=768){
-      const h=Math.min(window.innerWidth*0.8,340);
-      img.style.height=h+'px';
-      img.style.width='100%';
-      img.style.objectFit='contain';
-      img.style.display='block';
-      img.style.padding='12px';
-    }
-  },50);
+  // Aplica altura da imagem depois do modal estar visível
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      const img=document.getElementById('detail-main-img');
+      if(img && window.innerWidth<=768){
+        const h=Math.min(window.innerWidth*0.8,340);
+        img.style.height=h+'px';
+        img.style.width='100%';
+        img.style.objectFit='contain';
+        img.style.display='block';
+        img.style.padding='12px';
+      }
+      if(modalBody) modalBody.scrollTop=0;
+    });
+  });
 }
 
 function setMainImg(thumbEl, src){
