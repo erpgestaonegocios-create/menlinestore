@@ -164,30 +164,31 @@ section{padding:80px 24px;}
 .modal-close:hover{color:var(--white);}
 
 /* ── PRODUCT DETAIL ── */
-.product-detail{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:0;
-  flex:1;
-  overflow:hidden;
-}
-.product-detail-img{
-  background:#f0f0f0;
-  display:flex;flex-direction:column;
-  overflow:hidden;
-}
+.product-detail{display:grid;grid-template-columns:1fr 1fr;gap:0;flex:1;overflow:hidden;}
+
+/* LADO ESQUERDO: coluna da imagem */
+.product-detail-img{background:#f0f0f0;display:flex;flex-direction:column;overflow:hidden;}
+
+/* Container da imagem principal: ocupa todo espaço disponível */
 .product-detail-img .main-img-wrap{
   flex:1;
   display:flex;align-items:center;justify-content:center;
-  background:#f0f0f0;
   overflow:hidden;
+  background:#f0f0f0;
 }
+
+/* A imagem em si: nunca ultrapassa o container */
 .product-detail-img .main-img-wrap img{
-  max-width:100%;max-height:100%;
-  width:auto;height:auto;
+  display:block;
+  max-width:100%;
+  max-height:100%;
+  width:auto;
+  height:auto;
   object-fit:contain;
-  display:block;padding:20px;
+  padding:20px;
 }
+
+/* LADO DIREITO: info com scroll próprio */
 .product-detail-info{padding:32px;overflow-y:auto;}
 .product-detail-info h2{font-size:36px;color:var(--white);margin-bottom:8px;}
 .product-detail-price{font-size:40px;font-family:'Bebas Neue',sans-serif;color:var(--white);margin:12px 0;}
@@ -344,31 +345,32 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   /* No mobile, modal-body vira coluna com scroll total */
   .modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch;}
 
-  /* Produto detail no mobile: coluna única, imagem com aspect-ratio FIXO */
-  .product-detail{
-    display:block;
-    overflow:visible;
-    flex:none;
-  }
-  .product-detail-img{
-    width:100%;
-    flex-shrink:0;
-    overflow:visible; /* não corta mais nada */
-    height:auto;
-    min-height:unset;
-  }
+  /* Produto detail no mobile: empilha verticalmente */
+  .product-detail{display:flex;flex-direction:column;overflow:visible;flex:none;}
+
+  /* Coluna da imagem: largura total, altura definida pelo aspect-ratio */
+  .product-detail-img{width:100%;overflow:hidden;flex-shrink:0;}
+
+  /* Container da imagem: aspect-ratio 1:1 garante altura sem precisar de flex */
   .product-detail-img .main-img-wrap{
     width:100%;
-    aspect-ratio:1/1;  /* quadrado, igual ao Netshoes — garante altura suficiente */
-    height:auto;
-    min-height:unset;
+    aspect-ratio:1/1;
+    display:flex;align-items:center;justify-content:center;
     overflow:hidden;
+    background:#f0f0f0;
   }
+
+  /* Imagem: preenche o container sem cortar */
   .product-detail-img .main-img-wrap img{
-    width:100%;
-    height:100%;
+    display:block;
+    max-width:100%;
+    max-height:100%;
+    width:auto;
+    height:auto;
+    object-fit:contain;
     padding:16px;
   }
+
   .product-detail-info{padding:20px 16px;overflow-y:visible;}
   .product-detail-info h2{font-size:22px;}
   .product-detail-price{font-size:30px;}
@@ -882,11 +884,10 @@ async function openProduct(id, updateUrl=true){
       ${thumbsHtml}
     </div>`:'';
   const mainImgHtml=imgs.length
-    ?`<img src="${imgs[0]}" alt="${p.nome}" id="detail-main-img"
-        style="width:100%;height:100%;object-fit:contain;display:block;padding:16px;">`
+    ?`<img src="${imgs[0]}" alt="${p.nome}" id="detail-main-img">`
     :`<span style="font-size:80px;opacity:.3">👔</span>`;
   content.innerHTML=`
-    <div class="product-detail-img" style="flex-direction:column;align-items:stretch">
+    <div class="product-detail-img">
       <div class="main-img-wrap">
         ${mainImgHtml}
       </div>
