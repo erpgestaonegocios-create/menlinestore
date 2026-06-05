@@ -159,8 +159,12 @@ section{padding:80px 24px;}
 .modal-overlay.open{display:flex;}
 .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:900px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;}
 .modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
-/* modal-body NÃO tem overflow: o scroll fica no lado info */
+/* modal-body NÃO tem overflow: o scroll fica no lado info (produto) */
 .modal-body{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+/* Modal auth e outros pequenos: scroll no body do modal */
+#auth-modal .modal-body,
+#meus-pedidos-modal .modal-body,
+#checkout-modal .modal-body{overflow-y:auto;}
 .modal-close{background:none;border:none;color:var(--text3);font-size:24px;cursor:pointer;line-height:1;padding:4px;}
 .modal-close:hover{color:var(--white);}
 
@@ -750,7 +754,13 @@ async function api(path,opts={}){
 
 // ── STATE ───────────────────────────────────────────────────────
 let allProducts=[];
-let cart=JSON.parse(localStorage.getItem('mls_cart')||'[]');
+// Carrinho: persiste só se logado. Não logado usa sessionStorage (limpa ao fechar)
+function _cartStorage(){ return currentUser ? localStorage : sessionStorage; }
+let cart=(()=>{
+  const u=localStorage.getItem('mls_user');
+  if(u){ return JSON.parse(localStorage.getItem('mls_cart')||'[]'); }
+  return JSON.parse(sessionStorage.getItem('mls_cart')||'[]');
+})();
 let currentFilter='todos';
 let currentUser=JSON.parse(localStorage.getItem('mls_user')||'null');
 let notifyProductId=null;
@@ -1052,7 +1062,15 @@ function removeFromCart(key){
   saveCart();renderCart();
 }
 
-function saveCart(){localStorage.setItem('mls_cart',JSON.stringify(cart));}
+function saveCart(){
+  if(currentUser){
+    localStorage.setItem('mls_cart',JSON.stringify(cart));
+    sessionStorage.removeItem('mls_cart');
+  } else {
+    sessionStorage.setItem('mls_cart',JSON.stringify(cart));
+    localStorage.removeItem('mls_cart');
+  }
+}
 
 function renderCart(){
   const list=document.getElementById('cart-items-list');
@@ -1360,6 +1378,8 @@ async function fazerLogin(){
     if(!rows||!rows.length){showMsg('Senha incorreta. Tente novamente.','error');return;}
     currentUser=rows[0];
     localStorage.setItem('mls_user',JSON.stringify(currentUser));
+    // Migrar carrinho da sessão para localStorage agora que está logado
+    saveCart();
     updateUserUI();
     closeModal('auth-modal');
     toast('👋 Bem-vindo, '+currentUser.nome.split(' ')[0]+'!','success');
@@ -1394,7 +1414,7 @@ async function criarConta(){
   }catch(e){showMsg('Erro: '+e.message,'error');}
 }
 
-function fazerLogout(){currentUser=null;localStorage.removeItem('mls_user');updateUserUI();closeModal('auth-modal');toast('Até logo!','success');}
+function fazerLogout(){currentUser=null;localStorage.removeItem('mls_user');localStorage.removeItem('mls_cart');cart=[];renderCart();updateUserUI();closeModal('auth-modal');toast('Até logo!','success');}
 
 function updateUserUI(){
   const btn=document.getElementById('btn-user');
