@@ -907,7 +907,15 @@ async function openProduct(id, updateUrl=true){
   if(!imgs.length&&p.imagem_base64)imgs=[p.imagem_base64];
   // Sizes/genders from saldos
   const disponivel=p._saldos.filter(s=>parseFloat(s.quantidade||0)>0);
-  const tamanhos=[...new Set(p._saldos.map(s=>s.tamanho).filter(Boolean))];
+  const ordemTamanhos=['PP','P','M','G','GG','XG','XGG','EG','EGG','2XG','3XG','36','37','38','39','40','41','42','43','44','45','46','48','50','52','54','56','58','60'];
+  const tamanhos=[...new Set(p._saldos.map(s=>s.tamanho).filter(Boolean))].sort((a,b)=>{
+    const ia=ordemTamanhos.indexOf(a.toUpperCase());
+    const ib=ordemTamanhos.indexOf(b.toUpperCase());
+    if(ia===-1&&ib===-1)return a.localeCompare(b);
+    if(ia===-1)return 1;
+    if(ib===-1)return -1;
+    return ia-ib;
+  });
   const generos=[...new Set(p._saldos.map(s=>s.genero).filter(Boolean))];
   const esgotado=p._estoque===0;
   const preco='R$ '+parseFloat(p.preco_venda||0).toFixed(2).replace('.',',');
@@ -989,11 +997,19 @@ function selectSize(btn,size){
   document.querySelectorAll('#size-btns .size-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   selectedSize=size;
+  selectedQty=1;
+  const qv=document.getElementById('qty-val');if(qv)qv.textContent='1';
+  const msgEl=document.getElementById('detail-stock');if(msgEl)msgEl.innerHTML='';
 }
 function selectGenero(btn,genero){
   document.querySelectorAll('#genero-btns .size-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   selectedGenero=genero;
+  selectedSize=null;
+  selectedQty=1;
+  document.querySelectorAll('#size-btns .size-btn').forEach(b=>b.classList.remove('selected'));
+  const qv=document.getElementById('qty-val');if(qv)qv.textContent='1';
+  const msgEl=document.getElementById('detail-stock');if(msgEl)msgEl.innerHTML='';
 }
 function changeQty(delta){
   if(delta>0){
