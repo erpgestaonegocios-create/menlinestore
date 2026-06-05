@@ -993,13 +993,37 @@ let selectedGenero=null;
 let selectedQty=1;
 let currentProductId=null;
 
+function atualizarInfoEstoque(){
+  // Mostra disponibilidade imediatamente após selecionar tamanho/gênero
+  const p=allProducts.find(x=>parseInt(x.id)===parseInt(currentProductId));
+  if(!p)return;
+  const saldo=p._saldos.find(s=>
+    (!selectedGenero||(s.genero||'').toLowerCase()===(selectedGenero||'').toLowerCase())&&
+    (!selectedSize||(s.tamanho||'')===(selectedSize||''))
+  );
+  const maxEstoque=saldo?parseFloat(saldo.quantidade||0):0;
+  const key=`${currentProductId}_${selectedGenero||''}_${selectedSize||''}`;
+  const noCarrinho=cart.find(i=>i.key===key);
+  const qtdNoCarrinho=noCarrinho?noCarrinho.qty:0;
+  const disponivel=maxEstoque-qtdNoCarrinho;
+  const msgEl=document.getElementById('detail-stock');
+  if(!msgEl)return;
+  if(maxEstoque===0){
+    msgEl.innerHTML='<span style="color:var(--danger)">⚠️ Esgotado para esta seleção</span>';
+  } else if(disponivel<=3){
+    msgEl.innerHTML=`<span style="color:var(--warning)">⚠️ Últimas ${disponivel} unidade${disponivel===1?'':'s'} disponíveis</span>`;
+  } else {
+    msgEl.innerHTML=`<span style="color:var(--success)">✓ ${disponivel} unidade${disponivel===1?'':'s'} disponível${disponivel===1?'':'s'}</span>`;
+  }
+}
+
 function selectSize(btn,size){
   document.querySelectorAll('#size-btns .size-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   selectedSize=size;
   selectedQty=1;
   const qv=document.getElementById('qty-val');if(qv)qv.textContent='1';
-  const msgEl=document.getElementById('detail-stock');if(msgEl)msgEl.innerHTML='';
+  atualizarInfoEstoque();
 }
 function selectGenero(btn,genero){
   document.querySelectorAll('#genero-btns .size-btn').forEach(b=>b.classList.remove('selected'));
