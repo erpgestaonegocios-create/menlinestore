@@ -333,19 +333,21 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   /* Modal produto no mobile: tela cheia */
   .modal-overlay{align-items:center;padding:0;}
   .modal-box{
-    margin:0 12px;border-radius:16px;
-    max-height:95vh;height:auto;
-    position:relative;
+    margin:0 12px;
+    border-radius:16px;
+    max-height:92vh;
+    height:auto;
     max-width:100%!important;
-    display:flex;flex-direction:column;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
   }
-  /* Só o modal de produto ocupa altura total */
   #product-modal .modal-box{
-    margin:0;border-radius:16px;
-    height:95vh;
+    margin:0;
+    border-radius:16px;
+    height:92vh;
   }
-  .modal-body{overflow:hidden;flex:1;}
-  #product-modal .modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;}
 
   /* Produto detail no mobile */
   .product-detail{display:block;}
