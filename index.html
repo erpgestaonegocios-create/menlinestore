@@ -816,8 +816,12 @@ async function loadProducts(){
       p._estoque=p._saldos.reduce((s,r)=>s+parseFloat(r.quantidade||0),0);
     });
     renderFeatured();
-    // Se o usuário tentou ir para produtos antes de carregar, renderiza agora
-    if(window._pendingRenderProdutos){
+    // Sempre verificar se a seção produtos está visível e renderizar
+    const secProd=document.getElementById('section-produtos');
+    if(secProd&&secProd.style.display!=='none'){
+      renderAllProducts();
+      buildCategoryFilters();
+    } else if(window._pendingRenderProdutos){
       window._pendingRenderProdutos=false;
       renderAllProducts();
       buildCategoryFilters();
@@ -1258,26 +1262,100 @@ async function confirmarPedido(){
   if(!cidade){showMsg('Preencha a cidade.','error');return;}
   const total=cart.reduce((s,i)=>s+i.preco*i.qty,0);
   try{
-    // 1. Criar/atualizar cliente no sistema
+    // ETAPA 1: Validar estoque de TODOS os itens antes de gravar qualquer coisa
+    const saldosAtuais=await api('estoque_saldo?select=id,produto_id,genero,tamanho,quantidade&perfil_codigo=eq.'+encodeURIComponent(PERFIL));
+    for(const item of cart){
+      const saldo=(saldosAtuais||[]).find(s=>
+        s.produto_id===item.id&&
+        (s.genero||'')===(item.genero||'')&&
+        (s.tamanho||'')===(item.tamanho||'')
+      );
+      const qtdDisp=saldo?parseFloat(saldo.quantidade||0):0;
+      if(qtdDisp<item.qty){
+        showMsg(`Estoque insuficiente para "${item.nome}"${item.tamanho?' Tam.'+item.tamanho:''}. Disponível: ${qtdDisp}.`,'error');
+        return;
+      }
+    }
+
+    // ETAPA 2: Criar/atualizar cliente
     let clienteId=currentUser?.id||null;
     if(!clienteId){
       const cliExist=await api('clientes?email=eq.'+encodeURIComponent(email)+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&select=id').catch(()=>[]);
       if(cliExist&&cliExist.length){clienteId=cliExist[0].id;}
       else{
-        const novo=await api('clientes',{method:'POST',body:JSON.stringify({perfil_codigo:PERFIL,nome,email,telefone:tel,cep,endereco:end,cidade,estado:uf,ativo:true,origem:'site'})});
+        const novo=await api('clientes',{method:'POST',body:JSON.stringify({perfil_codigo:PERFIL,nome,email,telefone:tel,cep,endereco:end,numero:num||null,complemento:comp||null,bairro:bairro||null,cidade,estado:uf,ativo:true})});
         clienteId=(novo&&novo[0])?novo[0].id:null;
       }
     }
-    // 2. Registrar venda no financeiro com cálculo da taxa MP
+    if(!clienteId){showMsg('Erro ao identificar cliente. Tente novamente.','error');return;}
+
+    // ETAPA 3: Gravar compras, estoque e financeiro — tudo ou nada
+    const today=new Date().toISOString().slice(0,10);
+    const entregaLabel={'correios':'Correios','retirada':'Retirada presencial','app':'Via aplicativo'}[selectedEntrega]||selectedEntrega;
+    const itensTxt=cart.map(i=>i.nome+(i.genero?' '+i.genero:'')+(i.tamanho?' Tam.'+i.tamanho:'')+' ('+i.qty+'x)').join(', ').slice(0,120);
+
+    // 3a. Inserir compras e atualizar estoque (ambos obrigatórios)
+    for(const item of cart){
+      // Inserir em cliente_compras
+      await api('cliente_compras',{method:'POST',body:JSON.stringify({
+        perfil_codigo:PERFIL,
+        cliente_id:clienteId,
+        produto_id:item.id||null,
+        quantidade:item.qty,
+        valor_unitario:item.preco,
+        total_pago:parseFloat((item.preco*item.qty).toFixed(2)),
+        data_compra:today,
+        genero:item.genero||null,
+        tamanho:item.tamanho||null,
+        forma_entrega:selectedEntrega,
+        forma_pagamento:selectedPayment,
+        endereco_entrega:end,
+        numero_entrega:num||null,
+        complemento_entrega:comp||null,
+        bairro_entrega:bairro||null,
+        cidade_entrega:cidade,
+        estado_entrega:uf,
+        cep_entrega:cep,
+        status_entrega:'pendente',
+        pagamento_confirmado:false
+      })});
+      // Atualizar estoque (abater quantidade)
+      const saldo=(saldosAtuais||[]).find(s=>
+        s.produto_id===item.id&&
+        (s.genero||'')===(item.genero||'')&&
+        (s.tamanho||'')===(item.tamanho||'')
+      );
+      if(saldo){
+        const novoSaldo=parseFloat(saldo.quantidade||0)-item.qty;
+        await api('estoque_saldo?id=eq.'+saldo.id,{method:'PATCH',body:JSON.stringify({
+          quantidade:novoSaldo,
+          atualizado_em:new Date().toISOString()
+        })});
+        // Registrar movimentação de estoque
+        await api('estoque_movimentos',{method:'POST',body:JSON.stringify({
+          perfil_codigo:PERFIL,
+          produto_id:item.id,
+          tipo:'saida',
+          quantidade:item.qty,
+          quantidade_anterior:parseFloat(saldo.quantidade||0),
+          quantidade_posterior:novoSaldo,
+          motivo:'Venda online — Cliente: '+nome,
+          genero:item.genero||null,
+          tamanho:item.tamanho||null
+        })}).catch(()=>{});
+        // Atualizar estoque_atual no produto
+        api('produtos?id=eq.'+item.id+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL),
+          {method:'PATCH',body:JSON.stringify({estoque_atual:novoSaldo})}).catch(()=>{});
+      }
+    }
+
+    // 3b. Financeiro (após compras gravadas com sucesso)
     const taxas=await getTaxasMP();
     const taxaRate={pix:taxas.pix??0.99,cartao:taxas.cartao??4.98,boleto:taxas.boleto??2.99};
     const taxa=taxaRate[selectedPayment]||0;
     const valorBruto=total;
     const valorTaxa=parseFloat((valorBruto*(taxa/100)).toFixed(2));
     const valorLiquido=parseFloat((valorBruto-valorTaxa).toFixed(2));
-    const today=new Date().toISOString().slice(0,10);
-    const itensTxt=cart.map(i=>i.nome+(i.genero?' '+i.genero:'')+(i.tamanho?' Tam.'+i.tamanho:'')+' ('+i.qty+'x)').join(', ').slice(0,120);
-    // Receita: valor líquido (o que efetivamente entra na conta)
     await api('financeiro_lancamentos',{method:'POST',body:JSON.stringify({
       perfil_codigo:PERFIL,tipo:'receita',status:selectedPayment==='boleto'?'pendente':'pago',
       descricao:'Venda Site: '+itensTxt,
@@ -1286,7 +1364,6 @@ async function confirmarPedido(){
       cliente_id:clienteId,
       observacoes:'Venda registrada pelo site | Pagamento: '+selectedPayment.toUpperCase()+' | Bruto: R$ '+valorBruto.toFixed(2)+(valorTaxa>0?' | Taxa MP '+taxa+'%: -R$ '+valorTaxa.toFixed(2):'')
     })}).catch(()=>{});
-    // Despesa: taxa MP (somente se > 0)
     if(valorTaxa>0){
       await api('financeiro_lancamentos',{method:'POST',body:JSON.stringify({
         perfil_codigo:PERFIL,tipo:'despesa',status:'pago',
@@ -1295,34 +1372,6 @@ async function confirmarPedido(){
         data_vencimento:today,data_pagamento:today,
         observacoes:'GASTO_LOJA:💳 Taxa MP'
       })}).catch(()=>{});
-    }
-    // 3. Inserir cada item do carrinho em cliente_compras
-    const entregaLabel={'correios':'Correios','retirada':'Retirada presencial','app':'Via aplicativo'}[selectedEntrega]||selectedEntrega;
-    if(clienteId){
-      for(const item of cart){
-        await api('cliente_compras',{method:'POST',body:JSON.stringify({
-          perfil_codigo:PERFIL,
-          cliente_id:clienteId,
-          produto_id:item.id||null,
-          quantidade:item.qty,
-          valor_unitario:item.preco,
-          total_pago:parseFloat((item.preco*item.qty).toFixed(2)),
-          data_compra:today,
-          genero:item.genero||null,
-          tamanho:item.tamanho||null,
-          forma_entrega:selectedEntrega,
-          forma_pagamento:selectedPayment,
-          endereco_entrega:end,
-          numero_entrega:num||null,
-          complemento_entrega:comp||null,
-          bairro_entrega:bairro||null,
-          cidade_entrega:cidade,
-          estado_entrega:uf,
-          cep_entrega:cep,
-          status_entrega:'pendente',
-          pagamento_confirmado:false
-        })}).catch(e=>console.error('Erro ao salvar compra:',e));
-      }
     }
     // 4. Gerar link WhatsApp
     const itensTxtWA=cart.map(i=>`• ${i.nome}${i.genero?' '+i.genero:''}${i.tamanho?' Tam.'+i.tamanho:''} (${i.qty}x) — R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}`).join('\n');
