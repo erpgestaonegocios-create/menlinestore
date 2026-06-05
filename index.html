@@ -902,18 +902,12 @@ async function openProduct(id, updateUrl=true){
         🚚 Frete calculado no checkout · 🔒 Pagamento seguro · 📦 Embalagem caprichada
       </div>
     </div>`;
-  // Congela a página exatamente onde está, sem nenhum salto
-  const scrollY=window.scrollY;
-  document.body.style.position='fixed';
-  document.body.style.top=-scrollY+'px';
-  document.body.style.left='0';
-  document.body.style.right='0';
-  document.body.style.overflow='hidden';
   // Abre o modal com scroll interno zerado
   const modalBody=document.querySelector('#product-modal .modal-body');
   if(modalBody) modalBody.scrollTop=0;
   modal.classList.add('open');
   document.getElementById('backdrop').classList.add('show');
+  document.documentElement.style.overflow='hidden';
 }
 
 function setMainImg(thumbEl, src){
@@ -1355,13 +1349,7 @@ function setSearch(){setTimeout(()=>document.getElementById('search-input')?.foc
 function closeModal(id){
   document.getElementById(id).classList.remove('open');
   document.getElementById('backdrop').classList.remove('show');
-  const scrollY=parseInt(document.body.style.top||'0')*-1;
-  document.body.style.position='';
-  document.body.style.top='';
-  document.body.style.left='';
-  document.body.style.right='';
-  document.body.style.overflow='';
-  window.scrollTo(0,scrollY);
+  document.documentElement.style.overflow='';
   // Se fechou o modal de produto, volta o hash para a seção atual
   if(id==='product-modal'&&location.hash.startsWith('#produto-')){
     location.hash='produtos';
@@ -1371,13 +1359,7 @@ function closeAll(){
   document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));
   document.getElementById('cart-sidebar').classList.remove('open');
   document.getElementById('backdrop').classList.remove('show');
-  const scrollY=parseInt(document.body.style.top||'0')*-1;
-  document.body.style.position='';
-  document.body.style.top='';
-  document.body.style.left='';
-  document.body.style.right='';
-  document.body.style.overflow='';
-  window.scrollTo(0,scrollY);
+  document.documentElement.style.overflow='';
 }
 
 
