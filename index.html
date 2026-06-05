@@ -760,10 +760,10 @@ async function api(path,opts={}){
 
 // ── STATE ───────────────────────────────────────────────────────
 let allProducts=[];
-// Carrinho: persiste só se logado. Não logado usa sessionStorage (limpa ao fechar)
+// Carrinho: persiste só se logado (localStorage). Não logado: sessionStorage (limpa ao fechar aba)
 let cart=(()=>{
-  const u=localStorage.getItem('mls_user');
-  if(u){ return JSON.parse(localStorage.getItem('mls_cart')||'[]'); }
+  const logado=!!localStorage.getItem('mls_user');
+  if(logado) return JSON.parse(localStorage.getItem('mls_cart')||'[]');
   return JSON.parse(sessionStorage.getItem('mls_cart')||'[]');
 })();
 let currentFilter='todos';
@@ -1068,7 +1068,8 @@ function removeFromCart(key){
 }
 
 function saveCart(){
-  if(currentUser){
+  const logado=!!localStorage.getItem('mls_user');
+  if(logado){
     localStorage.setItem('mls_cart',JSON.stringify(cart));
     sessionStorage.removeItem('mls_cart');
   } else {
