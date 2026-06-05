@@ -760,12 +760,8 @@ async function api(path,opts={}){
 
 // ── STATE ───────────────────────────────────────────────────────
 let allProducts=[];
-// Carrinho: persiste só se logado (localStorage). Não logado: sessionStorage (limpa ao fechar aba)
-let cart=(()=>{
-  const logado=!!localStorage.getItem('mls_user');
-  if(logado) return JSON.parse(localStorage.getItem('mls_cart')||'[]');
-  return JSON.parse(sessionStorage.getItem('mls_cart')||'[]');
-})();
+// Carrinho: sempre no localStorage. Limpa apenas no logout explícito.
+let cart=JSON.parse(localStorage.getItem('mls_cart')||'[]');
 let currentFilter='todos';
 let currentUser=JSON.parse(localStorage.getItem('mls_user')||'null');
 let notifyProductId=null;
@@ -1068,14 +1064,7 @@ function removeFromCart(key){
 }
 
 function saveCart(){
-  const logado=!!localStorage.getItem('mls_user');
-  if(logado){
-    localStorage.setItem('mls_cart',JSON.stringify(cart));
-    sessionStorage.removeItem('mls_cart');
-  } else {
-    sessionStorage.setItem('mls_cart',JSON.stringify(cart));
-    localStorage.removeItem('mls_cart');
-  }
+  localStorage.setItem('mls_cart',JSON.stringify(cart));
 }
 
 function renderCart(){
