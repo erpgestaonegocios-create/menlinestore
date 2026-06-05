@@ -912,7 +912,7 @@ async function openProduct(id, updateUrl=true){
   if(modalBody) modalBody.scrollTop=0;
   modal.classList.add('open');
   document.getElementById('backdrop').classList.add('show');
-  document.documentElement.style.overflow='hidden';
+  document.body.style.overflowY='hidden';
 }
 
 function setMainImg(thumbEl, src){
@@ -1046,7 +1046,7 @@ function openCheckout(){
     <button class="btn-primary" style="width:100%;padding:14px;font-size:15px" onclick="confirmarPedido()">Confirmar pedido →</button>
   `;
   document.getElementById('checkout-modal').classList.add('open');
-  document.documentElement.style.overflow='hidden';
+  document.body.style.overflowY='hidden';
   document.getElementById('backdrop').classList.add('show');
 }
 
@@ -1175,7 +1175,7 @@ function openAuth(){
   if(currentUser){document.getElementById('auth-logged-out').style.display='none';document.getElementById('auth-logged-in').style.display='block';}
   else{document.getElementById('auth-logged-out').style.display='block';document.getElementById('auth-logged-in').style.display='none';}
   document.getElementById('auth-modal').classList.add('open');
-  document.documentElement.style.overflow='hidden';
+  document.body.style.overflowY='hidden';
   document.getElementById('backdrop').classList.add('show');
 }
 
@@ -1248,7 +1248,7 @@ function openNotify(prodId,prodNome){
   }
   closeModal('product-modal');
   document.getElementById('notify-modal').classList.add('open');
-  document.documentElement.style.overflow='hidden';
+  document.body.style.overflowY='hidden';
   document.getElementById('backdrop').classList.add('show');
 }
 
@@ -1353,7 +1353,7 @@ function setSearch(){setTimeout(()=>document.getElementById('search-input')?.foc
 function closeModal(id){
   document.getElementById(id).classList.remove('open');
   document.getElementById('backdrop').classList.remove('show');
-  document.documentElement.style.overflow='';
+  document.body.style.overflowY='';
   // Se fechou o modal de produto, volta o hash para a seção atual
   if(id==='product-modal'&&location.hash.startsWith('#produto-')){
     location.hash='produtos';
@@ -1363,7 +1363,7 @@ function closeAll(){
   document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));
   document.getElementById('cart-sidebar').classList.remove('open');
   document.getElementById('backdrop').classList.remove('show');
-  document.documentElement.style.overflow='';
+  document.body.style.overflowY='';
 }
 
 
