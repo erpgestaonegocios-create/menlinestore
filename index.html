@@ -904,11 +904,28 @@ async function openProduct(id, updateUrl=true){
     </div>`;
   modal.classList.add('open');
   document.getElementById('backdrop').classList.add('show');
+  setTimeout(()=>{
+    const img=document.getElementById('detail-main-img');
+    if(img && window.innerWidth<=768){
+      const h=Math.min(window.innerWidth*0.8,340);
+      img.style.height=h+'px';
+      img.style.width='100%';
+      img.style.objectFit='contain';
+      img.style.display='block';
+      img.style.padding='12px';
+    }
+  },50);
 }
 
 function setMainImg(thumbEl, src){
   const img=document.getElementById('detail-main-img');
-  if(img) img.src=src;
+  if(img){
+    img.src=src;
+    if(window.innerWidth<=768){
+      const h=Math.min(window.innerWidth*0.8,340);
+      img.style.height=h+'px';
+    }
+  }
   thumbEl.parentElement.querySelectorAll('div[onclick]').forEach(d=>d.style.borderColor='var(--border)');
   thumbEl.style.borderColor='var(--accent2)';
 }
