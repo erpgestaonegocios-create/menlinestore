@@ -1007,9 +1007,16 @@ function toggleCart(){
 }
 
 // ── CHECKOUT ────────────────────────────────────────────────────
+let pendingCheckout=false;
 function openCheckout(){
   if(!cart.length){toast('Carrinho vazio!','error');return;}
   document.getElementById('cart-sidebar').classList.remove('open');
+  // Se não estiver logado, abre auth e volta ao checkout após login/cadastro
+  if(!currentUser){
+    pendingCheckout=true;
+    openAuth();
+    return;
+  }
   const total=cart.reduce((s,i)=>s+i.preco*i.qty,0);
   const body=document.getElementById('checkout-body');
   const user=currentUser;
@@ -1179,11 +1186,15 @@ function buscarCepReg(v){buscarCep(v,'','reg-end','reg-cidade','reg-uf');}
 function buscarCepChk(v){buscarCep(v,'','chk-end','chk-cidade','chk-uf');}
 
 // ── AUTH ────────────────────────────────────────────────────────
-function openAuth(){
+function openAuth(tab='login'){
   if(currentUser){document.getElementById('auth-logged-out').style.display='none';document.getElementById('auth-logged-in').style.display='block';}
-  else{document.getElementById('auth-logged-out').style.display='block';document.getElementById('auth-logged-in').style.display='none';}
+  else{
+    document.getElementById('auth-logged-out').style.display='block';
+    document.getElementById('auth-logged-in').style.display='none';
+    authTab(tab);
+  }
   document.getElementById('auth-modal').classList.add('open');
-    document.getElementById('backdrop').classList.add('show');
+  document.getElementById('backdrop').classList.add('show');
 }
 
 function authTab(tab){
@@ -1206,6 +1217,7 @@ async function fazerLogin(){
     updateUserUI();
     closeModal('auth-modal');
     toast('👋 Bem-vindo, '+currentUser.nome.split(' ')[0]+'!','success');
+    if(pendingCheckout){pendingCheckout=false;setTimeout(()=>openCheckout(),300);}
   }catch(e){showMsg('Erro: '+e.message,'error');}
 }
 
@@ -1230,6 +1242,7 @@ async function criarConta(){
     localStorage.setItem('mls_user',JSON.stringify(currentUser));
     updateUserUI();closeModal('auth-modal');
     toast('🎉 Conta criada! Bem-vindo, '+nome.split(' ')[0]+'!','success');
+    if(pendingCheckout){pendingCheckout=false;setTimeout(()=>openCheckout(),300);}
   }catch(e){showMsg('Erro: '+e.message,'error');}
 }
 
