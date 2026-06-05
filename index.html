@@ -168,22 +168,22 @@ section{padding:80px 24px;}
 
 .product-detail-img{background:#f0f0f0;display:flex;flex-direction:column;overflow:hidden;}
 
-/* Técnica padding-bottom: cria altura proporcional independente de flex/load */
 .product-detail-img .main-img-wrap{
-  position:relative;
-  width:100%;
   flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   overflow:hidden;
   background:#f0f0f0;
 }
 .product-detail-img .main-img-wrap img{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
+  display:block;
+  max-width:100%;
+  max-height:100%;
+  width:auto;
+  height:auto;
   object-fit:contain;
   padding:20px;
-  display:block;
 }
 
 .product-detail-info{padding:32px;overflow-y:auto;}
@@ -341,19 +341,22 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   }
   .modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;}
 
-  /* Produto detail no mobile: TUDO simples, sem flex, sem position */
+  /* Produto detail no mobile */
   .product-detail{display:block;}
   .product-detail-img{display:block;width:100%;background:#f0f0f0;}
-  .product-detail-img .main-img-wrap{display:block;width:100%;background:#f0f0f0;line-height:0;}
+  .product-detail-img .main-img-wrap{
+    display:block;
+    width:100%;
+    height:80vw;
+    max-height:340px;
+    background:#f0f0f0;
+  }
   .product-detail-img .main-img-wrap img{
     display:block;
     width:100%;
-    height:80vw;        /* altura fixa: 80% da largura da tela */
-    max-height:340px;
+    height:100%;
     object-fit:contain;
     padding:12px;
-    position:static !important;  /* cancela qualquer position:absolute */
-    inset:auto !important;
   }
   .product-detail-info{display:block;padding:20px 16px;}
   .product-detail-info h2{font-size:22px;}
