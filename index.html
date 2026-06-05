@@ -333,11 +333,16 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   /* Modal produto no mobile: tela cheia */
   .modal-overlay{align-items:center;padding:0;}
   .modal-box{
-    margin:0;border-radius:16px;
-    max-height:95vh;height:95vh;
+    margin:0 12px;border-radius:16px;
+    max-height:95vh;height:auto;
     position:relative;
     max-width:100%!important;
     display:flex;flex-direction:column;
+  }
+  /* Só o modal de produto ocupa altura total */
+  #product-modal .modal-box{
+    margin:0;border-radius:16px;
+    height:95vh;
   }
   .modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;}
 
