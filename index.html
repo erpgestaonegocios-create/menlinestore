@@ -910,6 +910,13 @@ async function openProduct(id, updateUrl=true){
     </div>`;
   modal.classList.add('open');
   document.getElementById('backdrop').classList.add('show');
+  // Força reflow: sem isso, na segunda abertura o browser usa dimensões cacheadas
+  const wrap = content.querySelector('.main-img-wrap');
+  if(wrap){
+    wrap.style.display='none';
+    void wrap.offsetHeight; // lê propriedade para forçar reflow síncrono
+    wrap.style.display='';
+  }
 }
 
 function setMainImg(thumbEl, src){
