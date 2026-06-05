@@ -1674,12 +1674,19 @@ function rotear(){
   if(hash.startsWith('produto-')){
     const id=parseInt(hash.replace('produto-',''));
     if(!isNaN(id)){
-      showSection('produtos',false);
+      // Mostrar seção produtos sem renderizar o grid (modal vai abrir por cima)
+      document.querySelectorAll('[id^="section-"]').forEach(s=>{s.style.display='none';});
+      const secProd=document.getElementById('section-produtos');
+      if(secProd)secProd.style.display='block';
       // Aguarda produtos carregarem se ainda não carregaram
       const tentativa=()=>{
         const p=allProducts.find(x=>x.id===id);
         if(p){openProduct(id,false);}
         else if(allProducts.length===0){setTimeout(tentativa,200);}
+        else{
+          // Produto não encontrado — volta para o grid
+          showSection('produtos',false);
+        }
       };
       tentativa();
     }
