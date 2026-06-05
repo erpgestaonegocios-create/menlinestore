@@ -344,7 +344,8 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
     margin:0;border-radius:16px;
     height:95vh;
   }
-  .modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;}
+  .modal-body{overflow:hidden;flex:1;}
+  #product-modal .modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch;}
 
   /* Produto detail no mobile */
   .product-detail{display:block;}
@@ -912,8 +913,7 @@ async function openProduct(id, updateUrl=true){
   if(modalBody) modalBody.scrollTop=0;
   modal.classList.add('open');
   document.getElementById('backdrop').classList.add('show');
-  document.body.style.overflowY='hidden';
-}
+  }
 
 function setMainImg(thumbEl, src){
   const img=document.getElementById('detail-main-img');
@@ -1046,8 +1046,7 @@ function openCheckout(){
     <button class="btn-primary" style="width:100%;padding:14px;font-size:15px" onclick="confirmarPedido()">Confirmar pedido →</button>
   `;
   document.getElementById('checkout-modal').classList.add('open');
-  document.body.style.overflowY='hidden';
-  document.getElementById('backdrop').classList.add('show');
+    document.getElementById('backdrop').classList.add('show');
 }
 
 let selectedPayment='pix';
@@ -1175,8 +1174,7 @@ function openAuth(){
   if(currentUser){document.getElementById('auth-logged-out').style.display='none';document.getElementById('auth-logged-in').style.display='block';}
   else{document.getElementById('auth-logged-out').style.display='block';document.getElementById('auth-logged-in').style.display='none';}
   document.getElementById('auth-modal').classList.add('open');
-  document.body.style.overflowY='hidden';
-  document.getElementById('backdrop').classList.add('show');
+    document.getElementById('backdrop').classList.add('show');
 }
 
 function authTab(tab){
@@ -1248,8 +1246,7 @@ function openNotify(prodId,prodNome){
   }
   closeModal('product-modal');
   document.getElementById('notify-modal').classList.add('open');
-  document.body.style.overflowY='hidden';
-  document.getElementById('backdrop').classList.add('show');
+    document.getElementById('backdrop').classList.add('show');
 }
 
 async function salvarNotificacao(){
@@ -1353,8 +1350,7 @@ function setSearch(){setTimeout(()=>document.getElementById('search-input')?.foc
 function closeModal(id){
   document.getElementById(id).classList.remove('open');
   document.getElementById('backdrop').classList.remove('show');
-  document.body.style.overflowY='';
-  // Se fechou o modal de produto, volta o hash para a seção atual
+    // Se fechou o modal de produto, volta o hash para a seção atual
   if(id==='product-modal'&&location.hash.startsWith('#produto-')){
     location.hash='produtos';
   }
@@ -1363,8 +1359,7 @@ function closeAll(){
   document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));
   document.getElementById('cart-sidebar').classList.remove('open');
   document.getElementById('backdrop').classList.remove('show');
-  document.body.style.overflowY='';
-}
+  }
 
 
 // ── TOAST ────────────────────────────────────────────────────────
