@@ -340,14 +340,19 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
     max-width:100%!important;
     display:flex;
     flex-direction:column;
-    overflow:hidden;
   }
   #product-modal .modal-box{
     margin:0;
     border-radius:16px;
     height:92vh;
+    overflow:hidden;
   }
-  .modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;}
+  .modal-body{
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    flex:1;
+  }
+  .modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;display:block;}
 
   /* Produto detail no mobile */
   .product-detail{display:block;}
@@ -611,7 +616,9 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
 <!-- PRODUCT MODAL -->
 <div class="modal-overlay" id="product-modal">
   <div class="modal-box" style="max-width:860px">
-    <div class="product-detail" id="product-detail-content"></div>
+    <div class="modal-body" style="padding:0">
+      <div class="product-detail" id="product-detail-content"></div>
+    </div>
   </div>
 </div>
 
