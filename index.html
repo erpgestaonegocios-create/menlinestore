@@ -1022,7 +1022,7 @@ function selectSize(btn,size){
   btn.classList.add('selected');
   selectedSize=size;
   selectedQty=1;
-  const qv=document.getElementById('qty-val');if(qv)qv.textContent='1';
+  const qv=document.getElementById('detail-qty');if(qv)qv.textContent='1';
   atualizarInfoEstoque();
 }
 function selectGenero(btn,genero){
@@ -1032,7 +1032,7 @@ function selectGenero(btn,genero){
   selectedSize=null;
   selectedQty=1;
   document.querySelectorAll('#size-btns .size-btn').forEach(b=>b.classList.remove('selected'));
-  const qv=document.getElementById('qty-val');if(qv)qv.textContent='1';
+  const qv=document.getElementById('detail-qty');if(qv)qv.textContent='1';
   const msgEl=document.getElementById('detail-stock');if(msgEl)msgEl.innerHTML='';
 }
 function changeQty(delta){
