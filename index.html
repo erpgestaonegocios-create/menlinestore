@@ -1010,7 +1010,7 @@ function atualizarInfoEstoque(){
   if(maxEstoque===0){
     msgEl.innerHTML='<span style="color:var(--danger)">⚠️ Esgotado para esta seleção</span>';
   } else if(disponivel<=3){
-    msgEl.innerHTML=`<span style="color:var(--warning)">⚠️ Últimas ${disponivel} unidade${disponivel===1?'':'s'} disponíveis</span>`;
+    msgEl.innerHTML=`<span style="color:var(--warning)">⚠️ ${disponivel===1?'Somente 1 unidade disponível':`Últimas ${disponivel} unidades disponíveis`}</span>`;
   } else {
     msgEl.innerHTML=`<span style="color:var(--success)">✓ ${disponivel} unidade${disponivel===1?'':'s'} disponível${disponivel===1?'':'s'}</span>`;
   }
@@ -1457,14 +1457,17 @@ async function confirmarPedido(){
       (ultimas||[]).forEach(c=>comprasIds.push(c.id));
     }catch(e){}
 
-    // 5. [Notificação da loja será implementada via Telegram/WhatsApp Business]
+    // 5. Disparar emails ANTES do redirect (guardar cart em variável pois será limpo)
+    const cartSnapshot=[...cart];
     const msgEntrega={'correios':'Correios','retirada':'Retirada presencial','app':'Via aplicativo'}[selectedEntrega]||selectedEntrega;
+    try{ await emailPedidoRecebidoSite(nome, email, cartSnapshot, total); }catch(e){ console.error('email cliente:',e); }
+    try{ await emailVendaRealizadaLoja(nome, clienteId, cartSnapshot, total, selectedEntrega); }catch(e){ console.error('email loja:',e); }
 
     // 6. Redirecionar para Mercado Pago
     const chkBody=document.getElementById('checkout-body');
     chkBody.innerHTML=`<div style="text-align:center;padding:32px 0"><div class="spinner" style="margin:0 auto 16px"></div><p style="color:var(--text2);font-size:14px">Preparando pagamento seguro...</p></div>`;
     try{
-      const pref=await criarPreferenciaMP(cart, nome, email, comprasIds);
+      const pref=await criarPreferenciaMP(cartSnapshot, nome, email, comprasIds);
       const mpUrl=pref.sandbox_init_point||pref.init_point;
       if(mpUrl){
         cart=[];saveCart();renderCart();
@@ -1491,25 +1494,6 @@ async function confirmarPedido(){
         p._estoque=p._saldos.reduce((s,r)=>s+parseFloat(r.quantidade||0),0);
       });
     }catch(e){ console.warn('Erro ao atualizar saldos:',e); }
-    // Disparar email de confirmação ao cliente
-    try{
-      await emailPedidoRecebidoSite(nome, email, cart, total);
-    }catch(e){ console.error('email erro:',e); }
-    // Disparar email de notificação para a loja
-    try{
-      await emailVendaRealizadaLoja(nome, clienteId, cart, total, selectedEntrega);
-    }catch(e){ console.error('email loja erro:',e); }
-    // Notificar loja via WhatsApp (silencioso — abre em aba oculta)
-    try{
-      const msgLoja=`🛒 *Novo Pedido Recebido!*\n\n👤 *Cliente:* ${nome}\n📧 *Email:* ${email}\n📱 *WhatsApp:* ${tel||'Não informado'}\n\n🛍️ *Itens:*\n${cart.map(i=>`• ${i.nome}${i.genero?' '+i.genero:''}${i.tamanho?' Tam.'+i.tamanho:''} (${i.qty}x) — R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}`).join('\n')}\n\n💰 *Total:* R$ ${total.toFixed(2).replace('.',',')}\n💳 *Pagamento:* ${selectedPayment.toUpperCase()}\n🚚 *Entrega:* ${entregaLabel}\n\n📍 *Endereço:*\n${end}, ${num||''}${comp?' - '+comp:''}\n${bairro||''} — ${cidade}-${uf}\nCEP: ${cep}`;
-      const link=document.createElement('a');
-      link.href='https://wa.me/5531975174545?text='+encodeURIComponent(msgLoja);
-      link.target='_blank';
-      link.style.display='none';
-      document.body.appendChild(link);
-      link.click();
-      setTimeout(()=>document.body.removeChild(link),1000);
-    }catch(e){ console.error('notif loja:',e); }
     cart=[];saveCart();renderCart();
   }catch(e){showMsg('Erro ao processar pedido: '+e.message,'error');}
 }
