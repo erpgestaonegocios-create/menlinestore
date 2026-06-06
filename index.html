@@ -1844,7 +1844,7 @@ async function abrirMeusPedidos(){
   const wrap=document.getElementById('meus-pedidos-conteudo');
   wrap.innerHTML='<div class="loading-center"><div class="spinner"></div></div>';
   try{
-    const compras=await api('cliente_compras?select=*,produtos(nome)&cliente_id=eq.'+currentUser.id+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&order=data_compra.desc,id.desc');
+    const compras=await api('cliente_compras?select=*,pagamento_confirmado,produtos(nome)&cliente_id=eq.'+currentUser.id+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&order=data_compra.desc,id.desc');
     if(!compras||!compras.length){
       wrap.innerHTML='<div class="empty-state"><div class="icon">📦</div><h3>Nenhum pedido encontrado</h3><p style="font-size:13px;margin-top:8px">Você ainda não realizou nenhuma compra.</p></div>';
       return;
@@ -1852,13 +1852,17 @@ async function abrirMeusPedidos(){
     const fmtD=d=>d?new Date(d+'T12:00').toLocaleDateString('pt-BR'):'-';
     const fmtV=v=>'R$ '+parseFloat(v||0).toFixed(2).replace('.',',');
     const statusInfo={
-      'pendente':{label:'⏳ Processando',color:'var(--gold)'},
+      'pendente':{label:'⏳ Aguardando pagamento',color:'var(--gold)'},
+      'pendente_confirmado':{label:'✅ Pagamento confirmado',color:'var(--success)'},
       'postado':{label:'📦 Postado',color:'var(--accent2)'},
       'pronto_retirada':{label:'🏪 Pronto p/ Retirada',color:'var(--success)'},
       'entregue':{label:'✅ Entregue',color:'var(--success)'}
     };
     let html=compras.map(c=>{
-      const st=statusInfo[c.status_entrega||'pendente']||statusInfo['pendente'];
+      // Determinar status considerando pagamento_confirmado
+      let statusKey=c.status_entrega||'pendente';
+      if(statusKey==='pendente'&&c.pagamento_confirmado===true) statusKey='pendente_confirmado';
+      const st=statusInfo[statusKey]||statusInfo['pendente'];
       const rastreioHtml=c.codigo_rastreio?`
         <div style="margin-top:12px;padding:12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
           <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Código de Rastreamento</div>
