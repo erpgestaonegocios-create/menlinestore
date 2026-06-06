@@ -747,7 +747,6 @@ const SUPA_URL='https://uqigoyedyaltwjmfysnu.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxaWdveWVkeWFsdHdqbWZ5c251Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNjY2MjcsImV4cCI6MjA5MjY0MjYyN30.EtTJIzn-OITNfp2uraLgSM0HH7ZLLjewa4l0zOggutI';
 // Perfil da loja — lido do localStorage para facilitar configuração
 const PERFIL='lojista'; // Men Line Store — fixo, não requer configuração
-const MP_PUBLIC_KEY='';
 
 // ── API ──────────────────────────────────────────────────────────
 async function api(path,opts={}){
@@ -1453,32 +1452,39 @@ async function confirmarPedido(){
         observacoes:'GASTO_LOJA:💳 Taxa MP'
       })}).catch(()=>{});
     }
-    // 4. Gerar link WhatsApp
-    const itensTxtWA=cart.map(i=>`• ${i.nome}${i.genero?' '+i.genero:''}${i.tamanho?' Tam.'+i.tamanho:''} (${i.qty}x) — R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}`).join('\n');
-    const waMsg=encodeURIComponent(`Olá! Gostaria de confirmar meu pedido:\n\n${itensTxtWA}\n\nTotal: R$ ${total.toFixed(2).replace('.',',')}\n\nNome: ${nome}\nCEP: ${cep}\nEndereço: ${end}, ${cidade}-${uf}\nPagamento: ${selectedPayment.toUpperCase()}\nEntrega: ${entregaLabel}`);
-    // 5. Mensagem de confirmação conforme forma de entrega
-    const msgEntrega = selectedEntrega==='correios'
-      ? 'Finalize o pagamento para confirmarmos seu pedido.'
-      : 'Seu pedido está sendo preparado e você será informado sobre os próximos passos para realizar a retirada.';
-    const body=document.getElementById('checkout-body');
-    body.innerHTML=`
+    // 4. Coletar IDs das compras criadas
+    const comprasIds=[];
+    try{
+      const ultimas=await api('cliente_compras?cliente_id=eq.'+clienteId+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&order=id.desc&limit='+cart.length+'&select=id');
+      (ultimas||[]).forEach(c=>comprasIds.push(c.id));
+    }catch(e){}
+
+    // 5. [Notificação da loja será implementada via Telegram/WhatsApp Business]
+    const msgEntrega={'correios':'Correios','retirada':'Retirada presencial','app':'Via aplicativo'}[selectedEntrega]||selectedEntrega;
+
+    // 6. Redirecionar para Mercado Pago
+    const chkBody=document.getElementById('checkout-body');
+    chkBody.innerHTML=`<div style="text-align:center;padding:32px 0"><div class="spinner" style="margin:0 auto 16px"></div><p style="color:var(--text2);font-size:14px">Preparando pagamento seguro...</p></div>`;
+    try{
+      const pref=await criarPreferenciaMP(cart, nome, email, comprasIds);
+      const mpUrl=pref.sandbox_init_point||pref.init_point;
+      if(mpUrl){
+        cart=[];saveCart();renderCart();
+        window.location.href=mpUrl;
+        return;
+      }
+    }catch(e){ console.error('MP erro:',e); }
+    // Fallback se MP falhar
+    const msgE2=selectedEntrega==='correios'?'Finalize o pagamento para confirmarmos seu pedido.':'Seu pedido está sendo preparado e você será informado sobre os próximos passos.';
+    chkBody.innerHTML=`
       <div style="text-align:center;padding:16px 0 24px">
         <div style="font-size:56px;margin-bottom:12px">🎉</div>
-        <h2 style="font-size:28px;margin-bottom:8px">Pedido recebido!</h2>
-        <p style="color:var(--text2);font-size:14px;max-width:380px;margin:0 auto">${msgEntrega}</p>
+        <h2 style="font-size:28px;margin-bottom:8px">Pedido registrado!</h2>
+        <p style="color:var(--text2);font-size:14px;max-width:380px;margin:0 auto">${msgE2}</p>
       </div>
-      ${selectedPayment==='pix'?`
-      <div class="pix-box">
-        <p style="font-weight:600;margin-bottom:12px">Chave PIX:</p>
-        <div class="pix-key">${'storemenline@gmail.com'}<br><span style="font-size:11px;color:var(--text3)">(Celular / WhatsApp)</span></div>
-        <button class="btn-copy" onclick="navigator.clipboard.writeText('${'storemenline@gmail.com'}');toast('✅ Chave copiada!','success')">📋 Copiar chave PIX</button>
-        <p style="margin-top:16px;font-size:12px;color:var(--text3)">Após o pagamento, envie o comprovante pelo WhatsApp para agilizarmos o envio.</p>
-      </div>`
-      :`<div style="text-align:center;padding:8px 0 20px;color:var(--text2);font-size:13px">Você será redirecionado para o Mercado Pago para concluir o pagamento com segurança.</div>`}
       <div style="display:grid;gap:10px;margin-top:8px">
         <button class="btn-secondary" onclick="cart=[];saveCart();renderCart();closeModal('checkout-modal');">Fechar</button>
-      </div>
-    `;
+      </div>`;
     // Recarregar saldos de estoque em memória (reflete compra atual)
     try{
       const saldosAtt=await api('estoque_saldo?select=produto_id,genero,tamanho,quantidade&perfil_codigo=eq.'+encodeURIComponent(PERFIL));
@@ -1491,6 +1497,10 @@ async function confirmarPedido(){
     try{
       await emailPedidoRecebidoSite(nome, email, cart, total);
     }catch(e){ console.error('email erro:',e); }
+    // Disparar email de notificação para a loja
+    try{
+      await emailVendaRealizadaLoja(nome, clienteId, cart, total, selectedEntrega);
+    }catch(e){ console.error('email loja erro:',e); }
     // Notificar loja via WhatsApp (silencioso — abre em aba oculta)
     try{
       const msgLoja=`🛒 *Novo Pedido Recebido!*\n\n👤 *Cliente:* ${nome}\n📧 *Email:* ${email}\n📱 *WhatsApp:* ${tel||'Não informado'}\n\n🛍️ *Itens:*\n${cart.map(i=>`• ${i.nome}${i.genero?' '+i.genero:''}${i.tamanho?' Tam.'+i.tamanho:''} (${i.qty}x) — R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}`).join('\n')}\n\n💰 *Total:* R$ ${total.toFixed(2).replace('.',',')}\n💳 *Pagamento:* ${selectedPayment.toUpperCase()}\n🚚 *Entrega:* ${entregaLabel}\n\n📍 *Endereço:*\n${end}, ${num||''}${comp?' - '+comp:''}\n${bairro||''} — ${cidade}-${uf}\nCEP: ${cep}`;
@@ -1759,6 +1769,22 @@ function showSection(name,scroll=true){
 function rotear(){
   const hash=location.hash.replace('#','');
   if(!hash||hash==='home'){showSection('home',false);return;}
+  // Retorno do Mercado Pago
+  if(hash==='pagamento-aprovado'||hash==='pagamento-pendente'||hash==='pagamento-recusado'){
+    const msgs={
+      'pagamento-aprovado':  {icon:'✅', titulo:'Pagamento aprovado!',    texto:'Seu pagamento foi confirmado. Em breve você receberá um email com os detalhes.', cor:'#4caf7d'},
+      'pagamento-pendente':  {icon:'⏳', titulo:'Pagamento em análise',   texto:'Seu pedido foi registrado. Confirmaremos assim que o pagamento for aprovado.', cor:'#f59e0b'},
+      'pagamento-recusado':  {icon:'❌', titulo:'Pagamento não aprovado', texto:'Houve um problema com seu pagamento. Tente novamente ou escolha outra forma.', cor:'#ef4444'},
+    };
+    const m=msgs[hash];
+    history.replaceState(null,'','#home');
+    setTimeout(()=>{
+      toast(m.icon+' '+m.titulo,'success');
+    },500);
+    showSection('home');
+    return;
+  }
+
   if(hash.startsWith('produto-')){
     const id=parseInt(hash.replace('produto-',''));
     if(!isNaN(id)){
@@ -1876,6 +1902,44 @@ async function abrirMeusPedidos(){
 }
 
 
+// ── MERCADO PAGO ────────────────────────────────────────────────
+const MP_PUBLIC_KEY = 'APP_USR-7b03f19c-5e76-4b8a-b536-c9934add6195';
+const MP_FUNC_URL = 'https://uqigoyedyaltwjmfysnu.supabase.co/functions/v1/clever-processor';
+
+async function criarPreferenciaMP(itens, nomeCliente, emailCliente, compraIds){
+  const items = itens.map(i=>({
+    title: i.nome + (i.genero?' '+i.genero:'') + (i.tamanho?' Tam.'+i.tamanho:''),
+    quantity: i.qty,
+    unit_price: parseFloat(i.preco),
+    currency_id: 'BRL'
+  }));
+  const body = {
+    items,
+    payer: { name: nomeCliente, email: emailCliente },
+    back_urls: {
+      success: 'https://menlinestore.com.br/#pagamento-aprovado',
+      failure: 'https://menlinestore.com.br/#pagamento-recusado',
+      pending: 'https://menlinestore.com.br/#pagamento-pendente'
+    },
+    auto_return: 'approved',
+    external_reference: compraIds.join(','),
+    payment_methods: {
+      excluded_payment_types: [],
+      installments: 12
+    }
+  };
+  const res = await fetch(MP_FUNC_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY
+    },
+    body: JSON.stringify(body)
+  });
+  return await res.json();
+}
+
 // ── EMAIL via Resend ─────────────────────────────────────────────
 const RESEND_KEY='re_izhU8uCt_NUtfqRdmxJDfogqAhPcYCbws';
 let _emailTpls={};
@@ -1907,6 +1971,28 @@ async function dispararEmail(para,assunto,html){
     if(!res.ok) console.error('Resend erro:',res.status,data);
     else console.log('Email enviado:',data.id||'ok');
   }catch(e){console.error('email erro:',e);}
+}
+
+async function emailVendaRealizadaLoja(nomeCliente, codigoCliente, itens, total, formaEntrega){
+  await carregarTemplates();
+  const tpl=_emailTpls['venda_realizada'];
+  if(!tpl){ console.warn('Template venda_realizada não encontrado'); return; }
+  const entregaLabel={'correios':'📦 Correios','retirada':'🏪 Retirada presencial','app':'🛵 Via aplicativo'}[formaEntrega]||formaEntrega;
+  const itensHtml=itens.map(i=>`<tr>
+    <td style="padding:8px;border-bottom:1px solid #eee;font-size:13px">${i.nome}</td>
+    <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;font-size:13px">${i.genero||'—'}</td>
+    <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;font-size:13px">${i.tamanho||'—'}</td>
+    <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;font-size:13px">${i.qty}</td>
+    <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;font-size:13px">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</td>
+  </tr>`).join('');
+  const vars={
+    nome_cliente: nomeCliente,
+    codigo_cliente: codigoCliente||'—',
+    forma_entrega: entregaLabel,
+    itens_tabela: itensHtml,
+    total_pedido: 'R$ '+parseFloat(total).toFixed(2).replace('.',',')
+  };
+  return dispararEmail('storemenline@gmail.com', aplicarVars(tpl.assunto,vars), aplicarVars(tpl.corpo_html,vars));
 }
 
 async function emailPedidoRecebidoSite(nomeCliente,emailCliente,itens,total){
