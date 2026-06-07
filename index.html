@@ -1458,7 +1458,7 @@ async function confirmarPedido(){
     // 5. Disparar emails ANTES do redirect (guardar cart em variável pois será limpo)
     const cartSnapshot=[...cart];
     const msgEntrega={'correios':'Correios','retirada':'Retirada presencial','app':'Via aplicativo'}[selectedEntrega]||selectedEntrega;
-    try{ await emailPedidoRecebidoSite(nome, email, cartSnapshot, total); }catch(e){ console.error('email cliente:',e); }
+    try{ if(selectedEntrega==='correios'){ await emailPedidoRecebidoSite(nome,email,cartSnapshot,total); } else { await emailPedidoRecebidoRetirada(nome,email,cartSnapshot,total); } }catch(e){ console.error('email cliente:',e); }
     try{ await emailVendaRealizadaLoja(nome, clienteId, cartSnapshot, total, selectedEntrega); }catch(e){ console.error('email loja:',e); }
 
     // 6. Redirecionar para Mercado Pago
@@ -1979,9 +1979,18 @@ async function emailVendaRealizadaLoja(nomeCliente, codigoCliente, itens, total,
   return dispararEmail('storemenline@gmail.com', aplicarVars(tpl.assunto,vars), aplicarVars(tpl.corpo_html,vars));
 }
 
+async function emailPedidoRecebidoRetirada(nomeCliente,emailCliente,itens,total){
+  await carregarTemplates();
+  const tpl=_emailTpls['pedido_recebido_retirada'];
+  if(!tpl){ console.warn('Template pedido_recebido_retirada não encontrado'); return; }
+  const itensHtml=itens.map(i=>`<tr><td style="padding:8px;border-bottom:1px solid #eee">${i.nome}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.genero||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.tamanho||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.qty}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</td></tr>`).join('');
+  const vars={nome_cliente:nomeCliente,itens_tabela:itensHtml,total_pedido:'R$ '+parseFloat(total).toFixed(2).replace('.',',')};
+  return dispararEmail(emailCliente,aplicarVars(tpl.assunto,vars),aplicarVars(tpl.corpo_html,vars));
+}
+
 async function emailPedidoRecebidoSite(nomeCliente,emailCliente,itens,total){
   await carregarTemplates();
-  const tpl=_emailTpls['pedido_recebido'];
+  const tpl=_emailTpls['pedido_recebido_correios'];
   if(!tpl)return;
   const itensHtml=itens.map(i=>`<tr><td style="padding:8px;border-bottom:1px solid #eee">${i.nome}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.genero||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.tamanho||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.qty}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</td></tr>`).join('');
   const vars={nome_cliente:nomeCliente,itens_tabela:itensHtml,total_pedido:'R$ '+parseFloat(total).toFixed(2).replace('.',',')};
