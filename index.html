@@ -1125,7 +1125,16 @@ function changeQty(delta){
       if(selectedQty+delta>disponivel){
         const msgEl=document.getElementById('detail-stock');
         if(msgEl){
-          msgEl.innerHTML=`<span style="color:var(--danger)">⚠️ Disponível: apenas ${Math.max(0,disponivel)} unidade${disponivel===1?'':'s'}${selectedSize?' (tam. '+selectedSize+')':''}${selectedGenero?' · '+selectedGenero:''}</span>`;
+          if(disponivel<=0){
+            const _p=allProducts.find(x=>x.id===currentProductId);
+            const _nome=(_p?.nome||"")+(selectedGenero?" - "+selectedGenero:"")+(selectedSize?" - Tam. "+selectedSize:"");
+            const _nomeEsc=_nome.replace(/'/g,"");
+            msgEl.innerHTML='<span style="color:var(--danger)">⚠️ Produto esgotado</span>'
+              +'<br><button onclick="avisarReposicao(\''+_nomeEsc+'\')" '
+              +'style="margin-top:8px;padding:8px 14px;background:var(--accent);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:600;cursor:pointer">🔔 Avise-me quando estiver disponível</button>';
+          } else {
+            msgEl.innerHTML=`<span style="color:var(--danger)">⚠️ Disponível: apenas ${Math.max(0,disponivel)} unidade${disponivel===1?"":"s"}${selectedSize?" (tam. "+selectedSize+")":""}${selectedGenero?" · "+selectedGenero:""}</span>`;
+          }
         }
         return;
       }
@@ -1133,12 +1142,8 @@ function changeQty(delta){
   }
   selectedQty=Math.max(1,selectedQty+delta);
   document.getElementById('detail-qty').textContent=selectedQty;
-  // Limpa msg de estoque se diminuiu
-  if(delta<0){
-    const msgEl=document.getElementById('detail-stock');
-    const p=allProducts.find(x=>x.id===currentProductId);
-    if(msgEl&&p){msgEl.innerHTML='✓ Disponível em estoque';}
-  }
+  // Ao diminuir, chamar atualizarInfoEstoque para mostrar mensagem correta
+  if(delta<0) atualizarInfoEstoque();
 }
 
 // ── CART ────────────────────────────────────────────────────────
