@@ -985,7 +985,7 @@ async function openProduct(id, updateUrl=true){
       ${p.descricao?`<p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:16px">${p.descricao}</p>`:''}
       ${p.obs_site?`<div style="background:rgba(201,168,76,.15);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--gold)">📢 ${p.obs_site}</div>`:''}
       ${generos.length?`<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Gênero</div><div class="size-selector" id="genero-btns">${generoBtns}</div></div>`:''}
-      ${tamanhos.length?`<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Tamanho</div><div class="size-selector" id="size-btns">${sizeBtns}</div></div>`:''}
+      ${tamanhos.length?`<div id="size-wrap" style="margin-bottom:12px;${generos.length?"display:none":""}"><div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Tamanho</div><div class="size-selector" id="size-btns">${sizeBtns}</div></div>`:''}
       <div class="qty-selector">
         <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase">Qtd:</div>
         <button class="qty-btn" onclick="changeQty(-1)">−</button>
@@ -1107,6 +1107,8 @@ function selectGenero(btn,genero){
   selectedQty=1;
   const qv=document.getElementById('detail-qty');if(qv)qv.textContent='1';
   const msgEl=document.getElementById('detail-stock');if(msgEl)msgEl.innerHTML='';
+  // Mostrar bloco de tamanhos
+  const sizeWrapEl=document.getElementById('size-wrap');if(sizeWrapEl)sizeWrapEl.style.display='';
   // Atualizar tamanhos disponíveis para o gênero selecionado
   const p=allProducts.find(x=>parseInt(x.id)===parseInt(currentProductId));
   if(!p)return;
