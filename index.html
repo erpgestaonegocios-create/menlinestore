@@ -1103,9 +1103,32 @@ function selectGenero(btn,genero){
   document.querySelectorAll('#genero-btns .size-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   selectedGenero=genero;
+  selectedSize=null;
   selectedQty=1;
   const qv=document.getElementById('detail-qty');if(qv)qv.textContent='1';
   const msgEl=document.getElementById('detail-stock');if(msgEl)msgEl.innerHTML='';
+  // Atualizar tamanhos disponíveis para o gênero selecionado
+  const p=allProducts.find(x=>parseInt(x.id)===parseInt(currentProductId));
+  if(!p)return;
+  const ordemTamanhos=['PP','P','M','G','GG','XG','XGG','EG','EGG','2XG','3XG','36','37','38','39','40','41','42','43','44','45','46','48','50','52','54','56','58','60'];
+  const tamanhosDoGenero=[...new Set(p._saldos
+    .filter(s=>(s.genero||'').toLowerCase()===genero.toLowerCase())
+    .map(s=>s.tamanho).filter(Boolean)
+  )].sort((a,b)=>{
+    const ia=ordemTamanhos.indexOf(a.toUpperCase());
+    const ib=ordemTamanhos.indexOf(b.toUpperCase());
+    if(ia===-1&&ib===-1)return a.localeCompare(b);
+    if(ia===-1)return 1;if(ib===-1)return -1;
+    return ia-ib;
+  });
+  const sizeWrap=document.getElementById('size-btns');
+  if(sizeWrap&&tamanhosDoGenero.length){
+    sizeWrap.innerHTML=tamanhosDoGenero.map(t=>{
+      const saldo=p._saldos.find(s=>(s.genero||'').toLowerCase()===genero.toLowerCase()&&(s.tamanho||'').trim()===t.trim());
+      const avail=saldo&&parseFloat(saldo.quantidade||0)>0;
+      return `<button class="size-btn${avail?'':' unavailable'}" onclick="selectSize(this,'${t}')" data-size="${t}">${t}</button>`;
+    }).join('');
+  }
 }
 function changeQty(delta){
   if(delta>0){
