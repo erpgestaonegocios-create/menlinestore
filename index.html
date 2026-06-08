@@ -1022,6 +1022,10 @@ function selectSize(btn,size){
   selectedSize=size;
   selectedQty=1;
   const qv=document.getElementById('detail-qty');if(qv)qv.textContent='1';
+  // Garantir que selectedGenero bate com o botão visualmente marcado
+  const generoMarcado=document.querySelector('#genero-btns .size-btn.selected');
+  if(generoMarcado) selectedGenero=generoMarcado.dataset.genero||generoMarcado.textContent.trim();
+  const msgEl=document.getElementById('detail-stock');if(msgEl)msgEl.innerHTML='';
   atualizarInfoEstoque();
 }
 function selectGenero(btn,genero){
