@@ -1382,6 +1382,8 @@ async function openCheckout(){
   `;
   document.getElementById('checkout-modal').classList.add('open');
     document.getElementById('backdrop').classList.add('show');
+  // Aplicar desconto PIX se já está pré-selecionado
+  setTimeout(()=>atualizarTotalCheckout(),100);
 }
 
 let selectedPayment='pix';
