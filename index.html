@@ -1120,6 +1120,7 @@ function selectGenero(btn,genero){
   // Mostrar bloco de tamanhos
   const sizeWrapEl=document.getElementById('size-wrap');if(sizeWrapEl)sizeWrapEl.style.display='';
   // Atualizar tamanhos disponíveis para o gênero selecionado
+  // Pré-selecionar tamanho automaticamente se só houver um disponível (feito após renderizar)
   const p=allProducts.find(x=>parseInt(x.id)===parseInt(currentProductId));
   if(!p)return;
   const ordemTamanhos=['PP','P','M','G','GG','XG','XGG','EG','EGG','2XG','3XG','36','37','38','39','40','41','42','43','44','45','46','48','50','52','54','56','58','60'];
@@ -1140,6 +1141,9 @@ function selectGenero(btn,genero){
       const avail=saldo&&parseFloat(saldo.quantidade||0)>0;
       return `<button class="size-btn${avail?'':' unavailable'}" onclick="selectSize(this,'${t}')" data-size="${t}">${t}</button>`;
     }).join('');
+    // Auto-selecionar se só houver um tamanho disponível
+    const disponiveis=sizeWrap.querySelectorAll('.size-btn:not(.unavailable)');
+    if(disponiveis.length===1) disponiveis[0].click();
   }
 }
 function changeQty(delta){
