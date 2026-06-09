@@ -1181,14 +1181,14 @@ function addToCart(prodId){
   // Verificar se produto tem tamanhos disponíveis
   const tamanhos=[...new Set((p._saldos||[]).map(s=>s.tamanho).filter(Boolean))];
   const generos=[...new Set((p._saldos||[]).map(s=>s.genero).filter(Boolean))];
-  // Validar seleção obrigatória de tamanho
-  if(tamanhos.length>0&&!selectedSize){
-    if(msgEl)msgEl.innerHTML='<span style="color:var(--danger)">⚠️ Selecione um <strong>tamanho</strong> antes de adicionar ao carrinho.</span>';
-    return;
-  }
-  // Validar seleção obrigatória de gênero
+  // Validar seleção obrigatória de gênero (primeiro)
   if(generos.length>0&&!selectedGenero){
     if(msgEl)msgEl.innerHTML='<span style="color:var(--danger)">⚠️ Selecione um <strong>gênero</strong> antes de adicionar ao carrinho.</span>';
+    return;
+  }
+  // Validar seleção obrigatória de tamanho (depois)
+  if(tamanhos.length>0&&!selectedSize){
+    if(msgEl)msgEl.innerHTML='<span style="color:var(--danger)">⚠️ Selecione um <strong>tamanho</strong> antes de adicionar ao carrinho.</span>';
     return;
   }
   const key=`${prodId}_${selectedGenero||''}_${selectedSize||''}`;
@@ -1327,8 +1327,9 @@ async function openCheckout(){
     </div>
     <div style="margin-bottom:20px">
       <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Resumo do pedido</div>
-      ${cart.map(i=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${i.nome} ${i.genero?'· '+i.genero:''} ${i.tamanho?'· '+i.tamanho:''} (${i.qty}x)</span><span style="font-weight:600">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</span></div>`).join('')}
-      <div style="display:flex;justify-content:space-between;padding:10px 0 0;font-size:16px;font-weight:700"><span>Total</span><span>R$ ${total.toFixed(2).replace('.',',')}</span></div>
+      <div id="chk-itens-lista">${cart.map(i=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${i.nome} ${i.genero?'· '+i.genero:''} ${i.tamanho?'· '+i.tamanho:''} (${i.qty}x)</span><span style="font-weight:600">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</span></div>`).join('')}</div>
+      <div style="display:flex;justify-content:space-between;padding:10px 0 0;font-size:16px;font-weight:700"><span>Total</span><span id="chk-total-val">R$ ${total.toFixed(2).replace('.',',')}</span></div>
+      <div id="chk-desconto-info" style="display:none;font-size:12px;color:var(--success);text-align:right;margin-top:4px"></div>
     </div>
     <div style="margin-bottom:20px">
       <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Dados do comprador</div>
@@ -1401,6 +1402,42 @@ function selectPay(method,btn){
     card:'💳 <strong>Cartão de crédito ou débito</strong> — Processado com segurança via Mercado Pago. Parcelamento disponível.',
   };
   document.getElementById('pay-info').innerHTML=info[method]||'';
+  // Atualizar total com desconto PIX se aplicável
+  atualizarTotalCheckout();
+}
+
+function atualizarTotalCheckout(){
+  const totalEl=document.getElementById('chk-total-val');
+  const descontoEl=document.getElementById('chk-desconto-info');
+  const itensEl=document.getElementById('chk-itens-lista');
+  if(!totalEl)return;
+  let totalOriginal=0;
+  let totalComDesconto=0;
+  let temDesconto=false;
+  const itensHtml=cart.map(i=>{
+    const p=allProducts.find(x=>parseInt(x.id)===parseInt(i.id||i.prodId));
+    const precoOriginal=i.preco*i.qty;
+    let precoFinal=precoOriginal;
+    if(selectedPayment==='pix'&&p?.obs_site&&parseFloat(p?.desconto_pix||0)>0){
+      precoFinal=Math.max(0,i.preco-parseFloat(p.desconto_pix))*i.qty;
+      temDesconto=true;
+    }
+    totalOriginal+=precoOriginal;
+    totalComDesconto+=precoFinal;
+    const precoStr=precoFinal!==precoOriginal
+      ?`<span style="font-weight:600;color:var(--success)">R$ ${precoFinal.toFixed(2).replace('.',',')}</span> <span style="text-decoration:line-through;font-size:11px;opacity:.6">R$ ${precoOriginal.toFixed(2).replace('.',',')}</span>`
+      :`<span style="font-weight:600">R$ ${precoOriginal.toFixed(2).replace('.',',')}</span>`;
+    return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${i.nome} ${i.genero?'· '+i.genero:''} ${i.tamanho?'· '+i.tamanho:''} (${i.qty}x)</span>${precoStr}</div>`;
+  }).join('');
+  if(itensEl)itensEl.innerHTML=itensHtml;
+  totalEl.textContent='R$ '+totalComDesconto.toFixed(2).replace('.',',');
+  if(temDesconto&&descontoEl){
+    const economia=totalOriginal-totalComDesconto;
+    descontoEl.style.display='block';
+    descontoEl.innerHTML=`✅ Desconto PIX aplicado! Você economizou R$ ${economia.toFixed(2).replace('.',',')}`;
+  } else if(descontoEl){
+    descontoEl.style.display='none';
+  }
 }
 
 // ── TAXAS MP (busca do sistema de gestão) ───────────────────────
