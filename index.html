@@ -983,7 +983,10 @@ async function openProduct(id, updateUrl=true){
       <h2 style="font-size:28px">${p.nome}</h2>
       <div class="product-detail-price">${preco}</div>
       ${p.descricao?`<p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:16px">${p.descricao}</p>`:''}
-      ${p.obs_site?`<div style="background:rgba(201,168,76,.15);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--gold)">📢 ${p.obs_site}</div>`:''}
+      ${p.obs_site?`<div style="background:rgba(201,168,76,.15);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--gold)">
+        📢 ${p.obs_site}
+        ${p.desconto_pix>0?`<div style="margin-top:6px;font-size:12px">⚡ Pagando no PIX: <strong>R$ ${(p.preco_venda-p.desconto_pix).toFixed(2).replace('.',',')}</strong> <span style="text-decoration:line-through;opacity:.6">R$ ${parseFloat(p.preco_venda).toFixed(2).replace('.',',')}</span></div>`:''}
+      </div>`:''}
       ${generos.length?`<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Gênero</div><div class="size-selector" id="genero-btns">${generoBtns}</div></div>`:''}
       ${tamanhos.length?`<div id="size-wrap" style="margin-bottom:12px;${generos.length?"display:none":""}"><div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Tamanho</div><div class="size-selector" id="size-btns">${sizeBtns}</div></div>`:''}
       <div class="qty-selector">
@@ -1249,7 +1252,15 @@ function renderCart(){
   const list=document.getElementById('cart-items-list');
   const footer=document.getElementById('cart-footer');
   const badge=document.getElementById('cart-badge');
-  const total=cart.reduce((s,i)=>s+i.preco*i.qty,0);
+  // Calcular total com desconto PIX se aplicável
+  const calcPreco=(item)=>{
+    const p=allProducts.find(x=>parseInt(x.id)===parseInt(item.id||item.prodId));
+    if(selectedPayment==='pix'&&p?.obs_site&&parseFloat(p?.desconto_pix||0)>0){
+      return Math.max(0, item.preco - parseFloat(p.desconto_pix));
+    }
+    return item.preco;
+  };
+  const total=cart.reduce((s,i)=>s+calcPreco(i)*i.qty,0);
   const count=cart.reduce((s,i)=>s+i.qty,0);
   badge.textContent=count;
   badge.style.display=count?'flex':'none';
@@ -1480,8 +1491,8 @@ async function confirmarPedido(){
         cliente_id:clienteId,
         produto_id:parseInt(item.id||item.prodId)||null,
         quantidade:item.qty,
-        valor_unitario:item.preco,
-        total_pago:parseFloat((item.preco*item.qty).toFixed(2)),
+        valor_unitario:calcPreco(item),
+        total_pago:parseFloat((calcPreco(item)*item.qty).toFixed(2)),
         data_compra:today,
         genero:item.genero||null,
         tamanho:item.tamanho||null,
