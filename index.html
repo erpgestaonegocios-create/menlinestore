@@ -925,12 +925,15 @@ async function openProduct(id, updateUrl=true){
   }
   currentProductId=idNum;
   selectedSize=null;selectedGenero=null;selectedQty=1;
-  // Pré-selecionar gênero se houver apenas um
+  // Pré-selecionar gênero e/ou tamanho se houver apenas um
   setTimeout(()=>{
     const generoBtns=document.querySelectorAll('#genero-btns .size-btn');
-    if(generoBtns.length===1){
-      generoBtns[0].click();
-    }
+    if(generoBtns.length===1) generoBtns[0].click();
+    // Aguardar o clique do gênero atualizar os tamanhos antes de verificar
+    setTimeout(()=>{
+      const sizeBtns=document.querySelectorAll('#size-btns .size-btn:not(.unavailable)');
+      if(sizeBtns.length===1) sizeBtns[0].click();
+    },100);
   },50);
   if(updateUrl) location.hash='produto-'+idNum;
   const modal=document.getElementById('product-modal');
