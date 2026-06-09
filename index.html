@@ -1472,13 +1472,13 @@ async function confirmarPedido(){
     const entregaLabel={'correios':'Correios','retirada':'Retirada presencial','app':'Via aplicativo'}[selectedEntrega]||selectedEntrega;
     const itensTxt=cart.map(i=>i.nome+(i.genero?' '+i.genero:'')+(i.tamanho?' Tam.'+i.tamanho:'')+' ('+i.qty+'x)').join(', ').slice(0,120);
 
-    // 3a. Inserir compras e atualizar estoque (ambos obrigatórios)
+    // 3a. Inserir compras — SEM abater estoque e SEM gerar financeiro
+    // Estoque e financeiro só são movimentados após confirmação do MP (webhook)
     for(const item of cart){
-      // Inserir em cliente_compras
       await api('cliente_compras',{method:'POST',body:JSON.stringify({
         perfil_codigo:PERFIL,
         cliente_id:clienteId,
-        produto_id:item.id||null,
+        produto_id:parseInt(item.id||item.prodId)||null,
         quantidade:item.qty,
         valor_unitario:item.preco,
         total_pago:parseFloat((item.preco*item.qty).toFixed(2)),
@@ -1497,60 +1497,6 @@ async function confirmarPedido(){
         status_entrega:'pendente',
         pagamento_confirmado:false
       })});
-      // Atualizar estoque (abater quantidade)
-      const itemProdId2=parseInt(item.id||item.prodId);
-      const saldo=(saldosAtuais||[]).find(s=>
-        parseInt(s.produto_id)===itemProdId2&&
-        (s.genero||'').toLowerCase().trim()===(item.genero||'').toLowerCase().trim()&&
-        (s.tamanho||'').trim()===(item.tamanho||'').trim()
-      );
-      if(saldo){
-        const novoSaldo=parseFloat(saldo.quantidade||0)-item.qty;
-        await api('estoque_saldo?id=eq.'+saldo.id,{method:'PATCH',body:JSON.stringify({
-          quantidade:novoSaldo,
-          atualizado_em:new Date().toISOString()
-        })});
-        // Registrar movimentação de estoque
-        await api('estoque_movimentos',{method:'POST',body:JSON.stringify({
-          perfil_codigo:PERFIL,
-          produto_id:parseInt(item.id||item.prodId),
-          tipo:'saida',
-          quantidade:item.qty,
-          quantidade_anterior:parseFloat(saldo.quantidade||0),
-          quantidade_posterior:novoSaldo,
-          motivo:'Venda online — Cliente: '+nome,
-          genero:item.genero||null,
-          tamanho:item.tamanho||null
-        })}).catch(()=>{});
-        // Atualizar estoque_atual no produto
-        api('produtos?id=eq.'+item.id+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL),
-          {method:'PATCH',body:JSON.stringify({estoque_atual:novoSaldo})}).catch(()=>{});
-      }
-    }
-
-    // 3b. Financeiro (após compras gravadas com sucesso)
-    const taxas=await getTaxasMP();
-    const taxaRate={pix:taxas.pix??0.99,cartao:taxas.cartao??4.98,boleto:taxas.boleto??2.99};
-    const taxa=taxaRate[selectedPayment]||0;
-    const valorBruto=total;
-    const valorTaxa=parseFloat((valorBruto*(taxa/100)).toFixed(2));
-    const valorLiquido=parseFloat((valorBruto-valorTaxa).toFixed(2));
-    await api('financeiro_lancamentos',{method:'POST',body:JSON.stringify({
-      perfil_codigo:PERFIL,tipo:'receita',status:selectedPayment==='boleto'?'pendente':'pago',
-      descricao:'Venda Site: '+itensTxt,
-      valor:valorLiquido,
-      data_vencimento:today,data_pagamento:selectedPayment!=='boleto'?today:null,
-      cliente_id:clienteId,
-      observacoes:'Venda registrada pelo site | Pagamento: '+selectedPayment.toUpperCase()+' | Bruto: R$ '+valorBruto.toFixed(2)+(valorTaxa>0?' | Taxa MP '+taxa+'%: -R$ '+valorTaxa.toFixed(2):'')
-    })}).catch(()=>{});
-    if(valorTaxa>0){
-      await api('financeiro_lancamentos',{method:'POST',body:JSON.stringify({
-        perfil_codigo:PERFIL,tipo:'despesa',status:'pago',
-        descricao:'💳 Taxa MP ('+selectedPayment.toUpperCase()+') — Venda online',
-        valor:valorTaxa,
-        data_vencimento:today,data_pagamento:today,
-        observacoes:'GASTO_LOJA:💳 Taxa MP'
-      })}).catch(()=>{});
     }
     // 4. Coletar IDs das compras criadas
     const comprasIds=[];
