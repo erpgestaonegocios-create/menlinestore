@@ -1983,7 +1983,7 @@ async function criarConta(){
   }catch(e){showMsg('Erro: '+e.message,'error');}
 }
 
-function fazerLogout(){currentUser=null;localStorage.removeItem('mls_user');localStorage.removeItem('mls_cart');cart=[];renderCart();updateUserUI();closeModal('auth-modal');toast('Até logo!','success');}
+function fazerLogout(){currentUser=null;localStorage.removeItem('mls_user');localStorage.removeItem('mls_cart');localStorage.removeItem('mls_frete_calc');cart=[];renderCart();updateUserUI();closeModal('auth-modal');toast('Até logo!','success');}
 
 function updateUserUI(){
   const btn=document.getElementById('btn-user');
