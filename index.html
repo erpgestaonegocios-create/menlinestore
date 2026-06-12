@@ -1052,6 +1052,15 @@ async function openProduct(id, updateUrl=true){
       ${esgotado
         ?`<button class="btn-notify" onclick="openNotify(${p.id},'${p.nome.replace(/'/g,"\\'")}')">🔔 Avise-me quando disponível</button>`
         :`<button class="btn-add-cart" onclick="addToCart(${p.id})">Adicionar ao carrinho 🛒</button>`}
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">🚚 Calcular frete</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="frete-cep-input" placeholder="00000-000" maxlength="9" oninput="mascaraCepFrete(this)" onkeydown="if(event.key==='Enter')calcularFreteProduto()" style="flex:1;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--white);font-size:13px;outline:none">
+          <button onclick="calcularFreteProduto()" style="padding:10px 16px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--white);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">Calcular</button>
+        </div>
+        <div id="frete-resultado" style="display:none;margin-top:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:13px"></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px">Cálculo gratuito e estimado. O valor exato é confirmado no checkout.</div>
+      </div>
       <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)">
         🚚 Frete calculado no checkout · 🔒 Pagamento seguro · 📦 Embalagem caprichada
       </div>
@@ -1061,6 +1070,16 @@ async function openProduct(id, updateUrl=true){
   if(modalBody) modalBody.scrollTop=0;
   modal.classList.add('open');
   document.getElementById('backdrop').classList.add('show');
+  // Pré-preenche o CEP da calculadora de frete, se já calculado antes
+  try{
+    const saved=JSON.parse(localStorage.getItem('mls_frete_calc')||'null');
+    const cepUser=currentUser?.cep;
+    const cepToUse=cepUser||saved?.cep;
+    if(cepToUse){
+      const inp=document.getElementById('frete-cep-input');
+      if(inp){inp.value=cepToUse.replace(/(\d{5})(\d{3})/,'$1-$2');calcularFreteProduto();}
+    }
+  }catch(e){}
   }
 
 function setMainImg(thumbEl, src){
@@ -1355,6 +1374,24 @@ function toggleCart(){
 // ── CHECKOUT ────────────────────────────────────────────────────
 let pendingCheckout=false;
 let selectedEntrega='correios';
+let currentFrete=null; // {valor, regiao, prazo}
+
+function resolverFreteCheckout(){
+  const cepEl=document.getElementById('chk-cep');
+  const cep=cepEl?.value?.trim()||'';
+  const num=cep.replace(/\D/g,'');
+  // 1. Se o cliente logado já tem valor_frete gravado e o CEP é o mesmo cadastrado, usa direto
+  if(currentUser?.valor_frete!=null&&currentUser?.cep&&currentUser.cep.replace(/\D/g,'')===num){
+    currentFrete={valor:parseFloat(currentUser.valor_frete),regiao:null,prazo:null};
+  } else if(num.length===8){
+    const r=tabelaFretePorCep(num);
+    currentFrete=(r&&r.valor!=null)?{valor:r.valor,regiao:r.regiao,prazo:r.prazo}:null;
+  } else {
+    currentFrete=null;
+  }
+  atualizarTotalCheckout();
+}
+
 async function openCheckout(){
   if(!cart.length){toast('Carrinho vazio!','error');return;}
   selectedEntrega='correios'; // reset a cada abertura
@@ -1385,6 +1422,7 @@ async function openCheckout(){
     <div style="margin-bottom:20px">
       <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Resumo do pedido</div>
       <div id="chk-itens-lista">${cart.map(i=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${i.nome} ${i.genero?'· '+i.genero:''} ${i.tamanho?'· '+i.tamanho:''} (${i.qty}x)</span><span style="font-weight:600">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</span></div>`).join('')}</div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>🚚 Frete</span><span id="chk-frete-val" style="font-weight:600">—</span></div>
       <div style="display:flex;justify-content:space-between;padding:10px 0 0;font-size:16px;font-weight:700"><span>Total</span><span id="chk-total-val">R$ ${total.toFixed(2).replace('.',',')}</span></div>
       <div id="chk-desconto-info" style="display:none;font-size:12px;color:var(--success);text-align:right;margin-top:4px"></div>
     </div>
@@ -1396,7 +1434,7 @@ async function openCheckout(){
         <div class="form-group"><label>WhatsApp</label><input type="text" id="chk-tel" value="${user?.telefone||''}" placeholder="(31) 9xxxx-xxxx"></div>
       </div>
       <div class="form-grid">
-        <div class="form-group"><label>CEP</label><input type="text" id="chk-cep" value="${user?.cep||''}" placeholder="00000-000" oninput="buscarCepChk(this.value)"></div>
+        <div class="form-group"><label>CEP</label><input type="text" id="chk-cep" value="${user?.cep||''}" placeholder="00000-000" oninput="buscarCepChk(this.value);resolverFreteCheckout()"></div>
         <div class="form-group"><label>Endereço</label><input type="text" id="chk-end" value="${user?.endereco||''}" placeholder="Rua, avenida..."></div>
       </div>
       <div class="form-grid">
@@ -1435,6 +1473,23 @@ async function openCheckout(){
   `;
   document.getElementById('checkout-modal').classList.add('open');
     document.getElementById('backdrop').classList.add('show');
+  // Resolver frete: prioridade para CEP/valor_frete do cadastro do cliente;
+  // se não houver, usa o cálculo já feito pelo cliente antes do login (localStorage)
+  try{
+    const cepEl=document.getElementById('chk-cep');
+    if(user?.cep&&user?.valor_frete!=null){
+      currentFrete={valor:parseFloat(user.valor_frete),regiao:null,prazo:null};
+    } else {
+      const saved=JSON.parse(localStorage.getItem('mls_frete_calc')||'null');
+      if(saved?.valor!=null){
+        currentFrete={valor:parseFloat(saved.valor),regiao:saved.regiao,prazo:saved.prazo};
+        if(cepEl&&!cepEl.value&&saved.cep)cepEl.value=saved.cep.replace(/(\d{5})(\d{3})/,'$1-$2');
+      } else {
+        currentFrete=null;
+        if(cepEl?.value)resolverFreteCheckout();
+      }
+    }
+  }catch(e){currentFrete=null;}
   // Aplicar desconto PIX se já está pré-selecionado
   setTimeout(()=>atualizarTotalCheckout(),100);
 }
@@ -1450,6 +1505,7 @@ function selectEntrega(method, btn){
     'app':'🛵 <strong>Via aplicativo</strong> — Você contrata o app de entrega de sua preferência e por sua conta. Endereço de coleta: Rua Isaias José Diniz, 212. Europa — Contagem — MG.'
   };
   document.getElementById('entrega-info').innerHTML=infos[method]||'';
+  atualizarTotalCheckout();
 }
 
 function selectPay(method,btn){
@@ -1469,6 +1525,7 @@ function atualizarTotalCheckout(){
   const totalEl=document.getElementById('chk-total-val');
   const descontoEl=document.getElementById('chk-desconto-info');
   const itensEl=document.getElementById('chk-itens-lista');
+  const freteEl=document.getElementById('chk-frete-val');
   if(!totalEl)return;
   let totalOriginal=0;
   let totalComDesconto=0;
@@ -1489,7 +1546,25 @@ function atualizarTotalCheckout(){
     return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${i.nome} ${i.genero?'· '+i.genero:''} ${i.tamanho?'· '+i.tamanho:''} (${i.qty}x)</span>${precoStr}</div>`;
   }).join('');
   if(itensEl)itensEl.innerHTML=itensHtml;
-  totalEl.textContent='R$ '+totalComDesconto.toFixed(2).replace('.',',');
+  // Frete: só se aplica para entrega pelos Correios; retirada/app são gratuitos
+  let freteVal=0;
+  if(freteEl){
+    if(selectedEntrega==='correios'){
+      if(currentFrete?.valor!=null){
+        freteVal=currentFrete.valor;
+        freteEl.textContent='R$ '+freteVal.toFixed(2).replace('.',',');
+        freteEl.style.color='';
+      } else {
+        freteEl.textContent='Informe o CEP';
+        freteEl.style.color='var(--text3)';
+      }
+    } else {
+      freteEl.textContent='Gratuito';
+      freteEl.style.color='var(--success)';
+    }
+  }
+  const totalFinal=totalComDesconto+freteVal;
+  totalEl.textContent='R$ '+totalFinal.toFixed(2).replace('.',',');
   if(temDesconto&&descontoEl){
     const economia=totalOriginal-totalComDesconto;
     descontoEl.style.display='block';
@@ -1544,7 +1619,14 @@ async function confirmarPedido(){
   if(!num){showMsg('Preencha o número.','error');return;}
   if(!bairro){showMsg('Preencha o bairro.','error');return;}
   if(!cidade){showMsg('Preencha a cidade.','error');return;}
-  const total=cart.reduce((s,i)=>s+i.preco*i.qty,0);
+  // Frete: obrigatório calcular quando a entrega for pelos Correios
+  let freteValor=0;
+  if(selectedEntrega==='correios'){
+    if(currentFrete?.valor==null)resolverFreteCheckout();
+    if(currentFrete?.valor==null){showMsg('Não foi possível calcular o frete para este CEP. Verifique o CEP informado.','error');return;}
+    freteValor=parseFloat(currentFrete.valor)||0;
+  }
+  const total=cart.reduce((s,i)=>s+i.preco*i.qty,0)+freteValor;
   try{
     // ETAPA 1: Validar estoque de TODOS os itens antes de gravar qualquer coisa
     const saldosAtuais=await api('estoque_saldo?select=id,produto_id,genero,tamanho,quantidade&perfil_codigo=eq.'+encodeURIComponent(PERFIL));
@@ -1581,6 +1663,7 @@ async function confirmarPedido(){
 
     // 3a. Inserir compras — SEM abater estoque e SEM gerar financeiro
     // Estoque e financeiro só são movimentados após confirmação do MP (webhook)
+    let primeiroItem=true;
     for(const item of cart){
       await api('cliente_compras',{method:'POST',body:JSON.stringify({
         perfil_codigo:PERFIL,
@@ -1588,7 +1671,8 @@ async function confirmarPedido(){
         produto_id:parseInt(item.id||item.prodId)||null,
         quantidade:item.qty,
         valor_unitario:calcPreco(item),
-        total_pago:parseFloat((calcPreco(item)*item.qty).toFixed(2)),
+        total_pago:parseFloat((calcPreco(item)*item.qty + (primeiroItem?freteValor:0)).toFixed(2)),
+        valor_frete:primeiroItem?freteValor:0,
         data_compra:today,
         genero:item.genero||null,
         tamanho:item.tamanho||null,
@@ -1604,6 +1688,19 @@ async function confirmarPedido(){
         status_entrega:'pendente',
         pagamento_confirmado:false
       })});
+      primeiroItem=false;
+    }
+    // 3b. Registrar o frete para controle no painel "Fretes" do Financeiro
+    if(freteValor>0){
+      try{
+        await api('fretes_pedidos',{method:'POST',body:JSON.stringify({
+          perfil_codigo:PERFIL,
+          cliente_id:clienteId,
+          valor:freteValor,
+          descricao:'Frete (Correios) - '+itensTxt,
+          data:today
+        })});
+      }catch(e){ console.warn('Erro ao registrar frete no financeiro:',e); }
     }
     // 4. Coletar IDs das compras criadas
     const comprasIds=[];
@@ -1622,7 +1719,7 @@ async function confirmarPedido(){
     const chkBody=document.getElementById('checkout-body');
     chkBody.innerHTML=`<div style="text-align:center;padding:32px 0"><div class="spinner" style="margin:0 auto 16px"></div><p style="color:var(--text2);font-size:14px">Preparando pagamento seguro...</p></div>`;
     try{
-      const pref=await criarPreferenciaMP(cartSnapshot, nome, email, comprasIds);
+      const pref=await criarPreferenciaMP(cartSnapshot, nome, email, comprasIds, freteValor);
       const mpUrl=pref.sandbox_init_point||pref.init_point;
       if(mpUrl){
         cart=[];saveCart();renderCart();
@@ -1651,6 +1748,81 @@ async function confirmarPedido(){
     }catch(e){ console.warn('Erro ao atualizar saldos:',e); }
     cart=[];saveCart();renderCart();
   }catch(e){showMsg('Erro ao processar pedido: '+e.message,'error');}
+}
+
+// ── FRETE — tabela por CEP (mesma usada no sistema de gestão) ───
+function tabelaFretePorCep(cep){
+  const num=String(cep||'').replace(/\D/g,'');
+  if(num.length!==8)return null;
+  const prefix=parseInt(num.slice(0,5));
+  let regiao,valor,prazo;
+  if(prefix>=1000&&prefix<=19999){regiao='São Paulo Capital';valor=12.00;prazo='1-2 dias úteis';}
+  else if(prefix>=20000&&prefix<=28999){regiao='Rio de Janeiro';valor=15.00;prazo='2-3 dias úteis';}
+  else if(prefix>=29000&&prefix<=29999){regiao='Espírito Santo';valor=16.00;prazo='2-3 dias úteis';}
+  else if(prefix>=30000&&prefix<=39999){regiao='Minas Gerais';valor=14.00;prazo='1-3 dias úteis';}
+  else if(prefix>=40000&&prefix<=48999){regiao='Bahia';valor=22.00;prazo='3-5 dias úteis';}
+  else if(prefix>=49000&&prefix<=49999){regiao='Sergipe';valor=24.00;prazo='3-5 dias úteis';}
+  else if(prefix>=50000&&prefix<=56999){regiao='Pernambuco';valor=25.00;prazo='4-6 dias úteis';}
+  else if(prefix>=57000&&prefix<=57999){regiao='Alagoas';valor=26.00;prazo='4-6 dias úteis';}
+  else if(prefix>=58000&&prefix<=58999){regiao='Paraíba';valor=27.00;prazo='4-6 dias úteis';}
+  else if(prefix>=59000&&prefix<=59999){regiao='Rio Grande do Norte';valor=28.00;prazo='4-7 dias úteis';}
+  else if(prefix>=60000&&prefix<=63999){regiao='Ceará';valor=29.00;prazo='5-7 dias úteis';}
+  else if(prefix>=64000&&prefix<=64999){regiao='Piauí';valor=30.00;prazo='5-8 dias úteis';}
+  else if(prefix>=65000&&prefix<=65999){regiao='Maranhão';valor=32.00;prazo='5-8 dias úteis';}
+  else if(prefix>=66000&&prefix<=68899){regiao='Pará';valor=35.00;prazo='6-10 dias úteis';}
+  else if(prefix>=68900&&prefix<=68999){regiao='Amapá';valor=38.00;prazo='7-12 dias úteis';}
+  else if(prefix>=69000&&prefix<=69299){regiao='Amazonas';valor=40.00;prazo='7-12 dias úteis';}
+  else if(prefix>=69300&&prefix<=69399){regiao='Roraima';valor=42.00;prazo='8-14 dias úteis';}
+  else if(prefix>=69400&&prefix<=69899){regiao='Acre';valor=45.00;prazo='8-14 dias úteis';}
+  else if(prefix>=69900&&prefix<=69999){regiao='Rondônia';valor=38.00;prazo='6-10 dias úteis';}
+  else if(prefix>=70000&&prefix<=73699){regiao='Distrito Federal';valor=18.00;prazo='2-4 dias úteis';}
+  else if(prefix>=73700&&prefix<=76799){regiao='Goiás';valor=19.00;prazo='2-4 dias úteis';}
+  else if(prefix>=76800&&prefix<=77999){regiao='Tocantins';valor=28.00;prazo='4-7 dias úteis';}
+  else if(prefix>=78000&&prefix<=78899){regiao='Mato Grosso';valor=25.00;prazo='3-6 dias úteis';}
+  else if(prefix>=78900&&prefix<=79999){regiao='Mato Grosso do Sul';valor=22.00;prazo='3-5 dias úteis';}
+  else if(prefix>=80000&&prefix<=87999){regiao='Paraná';valor=16.00;prazo='2-3 dias úteis';}
+  else if(prefix>=88000&&prefix<=89999){regiao='Santa Catarina';valor=18.00;prazo='2-4 dias úteis';}
+  else if(prefix>=90000&&prefix<=99999){regiao='Rio Grande do Sul';valor=20.00;prazo='2-4 dias úteis';}
+  else{regiao='Região não identificada';valor=null;prazo='—';}
+  return {regiao,valor,prazo};
+}
+
+// Calculadora de frete na página do produto — funciona para qualquer
+// visitante, sem login. Salva o resultado em localStorage para reuso
+// automático no checkout (caso o cliente faça login depois).
+function calcularFreteProduto(){
+  const inp=document.getElementById('frete-cep-input');
+  const box=document.getElementById('frete-resultado');
+  if(!inp||!box)return;
+  const cep=inp.value.trim();
+  const num=cep.replace(/\D/g,'');
+  if(num.length!==8){
+    box.style.display='block';
+    box.innerHTML='<span style="color:var(--danger)">Digite um CEP válido (8 dígitos).</span>';
+    return;
+  }
+  const r=tabelaFretePorCep(num);
+  box.style.display='block';
+  if(!r||r.valor==null){
+    box.innerHTML='<span style="color:var(--text2)">Não foi possível calcular o frete para este CEP. Consulte-nos pelo WhatsApp.</span>';
+    return;
+  }
+  const precoFmt='R$ '+r.valor.toFixed(2).replace('.',',');
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
+    +'<div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Destino</div><div style="font-weight:600">'+r.regiao+'</div></div>'
+    +'<div style="text-align:center"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Frete</div><div style="font-size:18px;font-weight:700;color:var(--success)">'+precoFmt+'</div></div>'
+    +'<div style="text-align:right"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Prazo</div><div style="font-weight:600;color:var(--accent2)">'+r.prazo+'</div></div>'
+    +'</div>';
+  // Guarda para reaproveitar no checkout (gratuito, sem necessidade de novo cálculo)
+  try{
+    localStorage.setItem('mls_frete_calc',JSON.stringify({cep:num,valor:r.valor,regiao:r.regiao,prazo:r.prazo}));
+  }catch(e){}
+}
+
+function mascaraCepFrete(el){
+  let v=el.value.replace(/\D/g,'').slice(0,8);
+  if(v.length>5)v=v.slice(0,5)+'-'+v.slice(5);
+  el.value=v;
 }
 
 // ── CEP LOOKUP ──────────────────────────────────────────────────
@@ -2079,13 +2251,21 @@ async function abrirMeusPedidos(){
 const MP_PUBLIC_KEY = 'APP_USR-f5509046-0dc8-4303-9207-821b77d1968b';
 const MP_FUNC_URL = 'https://uqigoyedyaltwjmfysnu.supabase.co/functions/v1/clever-processor';
 
-async function criarPreferenciaMP(itens, nomeCliente, emailCliente, compraIds){
+async function criarPreferenciaMP(itens, nomeCliente, emailCliente, compraIds, freteValor=0){
   const items = itens.map(i=>({
     title: i.nome + (i.genero?' '+i.genero:'') + (i.tamanho?' Tam.'+i.tamanho:''),
     quantity: i.qty,
     unit_price: parseFloat(i.preco),
     currency_id: 'BRL'
   }));
+  if(freteValor>0){
+    items.push({
+      title: 'Frete (Correios)',
+      quantity: 1,
+      unit_price: parseFloat(freteValor.toFixed(2)),
+      currency_id: 'BRL'
+    });
+  }
   const body = {
     items,
     payer: { name: nomeCliente, email: emailCliente },
