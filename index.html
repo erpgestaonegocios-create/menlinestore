@@ -204,6 +204,7 @@ section{padding:80px 24px;}
 .qty-btn:hover{border-color:var(--border2);background:var(--surface);}
 .qty-val{font-size:18px;font-weight:600;min-width:32px;text-align:center;}
 .stock-info{font-size:12px;color:var(--success);margin-bottom:16px;}
+.views-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--gold);margin-bottom:12px;}
 .btn-add-cart{width:100%;padding:14px;background:var(--accent2);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:.2s;letter-spacing:.04em;margin-bottom:10px;}
 .btn-add-cart:hover{background:var(--navy2);transform:translateY(-1px);}
 .btn-notify{width:100%;padding:12px;background:transparent;color:var(--text2);border:1px solid var(--border);border-radius:10px;font-size:13px;cursor:pointer;transition:.2s;}
@@ -1048,6 +1049,7 @@ async function openProduct(id, updateUrl=true){
         <span class="qty-val" id="detail-qty">1</span>
         <button class="qty-btn" onclick="changeQty(1)">+</button>
       </div>
+      <div id="detail-views"></div>
       <div class="stock-info" id="detail-stock">${esgotado?'<span style="color:var(--danger)">Produto esgotado</span>':'✓ Disponível em estoque'}</div>
       ${esgotado
         ?`<button class="btn-notify" onclick="openNotify(${p.id},'${p.nome.replace(/'/g,"\\'")}')">🔔 Avise-me quando disponível</button>`
@@ -1070,6 +1072,8 @@ async function openProduct(id, updateUrl=true){
   if(modalBody) modalBody.scrollTop=0;
   modal.classList.add('open');
   document.getElementById('backdrop').classList.add('show');
+  // Contagem de visualizações (por sessão)
+  registrarVisualizacao(idNum, p);
   // Pré-preenche o CEP da calculadora de frete, se já calculado antes
   try{
     const saved=JSON.parse(localStorage.getItem('mls_frete_calc')||'null');
@@ -1081,6 +1085,39 @@ async function openProduct(id, updateUrl=true){
     }
   }catch(e){}
   }
+
+async function registrarVisualizacao(produtoId, p){
+  try{
+    // Controle por sessão: cada produto só conta uma vez por sessão
+    const sessKey='mls_view_'+produtoId;
+    const jaContou=sessionStorage.getItem(sessKey);
+
+    let visualizacoes = parseInt(p.visualizacoes||0);
+
+    if(!jaContou){
+      // Incrementa no banco
+      await fetch(SUPA_URL+'/rest/v1/rpc/incrementar_visualizacao',{
+        method:'POST',
+        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({produto_id_param: produtoId})
+      });
+      sessionStorage.setItem(sessKey,'1');
+      visualizacoes += 1;
+      // Atualiza em memória também
+      p.visualizacoes = visualizacoes;
+    }
+
+    // Exibe badge se >= 10
+    const badge=document.getElementById('detail-views');
+    if(badge){
+      if(visualizacoes>=10){
+        badge.innerHTML=`<div class="views-badge">🔥 ${visualizacoes} pessoas estão de olho nesse produto</div>`;
+      } else {
+        badge.innerHTML='';
+      }
+    }
+  }catch(e){console.warn('visualizacoes:',e);}
+}
 
 function setMainImg(thumbEl, src){
   const img=document.getElementById('detail-main-img');
@@ -1501,8 +1538,8 @@ function selectEntrega(method, btn){
   btn.classList.add('active');
   const infos={
     'correios':'📦 <strong>Correios</strong> — Entrega em todo o Brasil com rastreamento.',
-    'retirada':'🏪 <strong>Retirada presencial</strong> — Todos os dados serão enviados via email assim que o pagamento for confirmado.',
-    'app':'🛵 <strong>Via aplicativo</strong> — Você contrata o app de entrega de sua preferência e por sua conta. Todos os dados serão enviados via email assim que o pagamento for confirmado.'
+    'retirada':'🏪 <strong>Retirada presencial</strong> — Rua Isaias José Diniz, 212. Europa — Contagem — MG.',
+    'app':'🛵 <strong>Via aplicativo</strong> — Você contrata o app de entrega de sua preferência e por sua conta. Endereço de coleta: Rua Isaias José Diniz, 212. Europa — Contagem — MG.'
   };
   document.getElementById('entrega-info').innerHTML=infos[method]||'';
   atualizarTotalCheckout();
