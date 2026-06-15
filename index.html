@@ -1501,8 +1501,8 @@ function selectEntrega(method, btn){
   btn.classList.add('active');
   const infos={
     'correios':'📦 <strong>Correios</strong> — Entrega em todo o Brasil com rastreamento.',
-    'retirada':'🏪 <strong>Retirada presencial</strong> — Rua Isaias José Diniz, 212. Europa — Contagem — MG.',
-    'app':'🛵 <strong>Via aplicativo</strong> — Você contrata o app de entrega de sua preferência e por sua conta. Endereço de coleta: Rua Isaias José Diniz, 212. Europa — Contagem — MG.'
+    'retirada':'🏪 <strong>Retirada presencial</strong> — Todos os dados serão enviados via email assim que o pagamento for confirmado.',
+    'app':'🛵 <strong>Via aplicativo</strong> — Você contrata o app de entrega de sua preferência e por sua conta. Todos os dados serão enviados via email assim que o pagamento for confirmado.'
   };
   document.getElementById('entrega-info').innerHTML=infos[method]||'';
   atualizarTotalCheckout();
