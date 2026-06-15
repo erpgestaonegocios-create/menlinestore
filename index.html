@@ -1097,8 +1097,6 @@ async function registrarVisualizacao(produtoId, p){
     setTimeout(()=>sessionStorage.removeItem(lockKey), 2000);
     const jaContou=sessionStorage.getItem(sessKey);
 
-    let visualizacoes = parseInt(p.visualizacoes||0);
-
     if(!jaContou){
       // Incrementa no banco
       await fetch(SUPA_URL+'/rest/v1/rpc/incrementar_visualizacao',{
@@ -1107,10 +1105,13 @@ async function registrarVisualizacao(produtoId, p){
         body:JSON.stringify({produto_id_param: produtoId})
       });
       sessionStorage.setItem(sessKey,'1');
-      visualizacoes += 1;
-      // Atualiza em memória também
-      p.visualizacoes = visualizacoes;
     }
+
+    // Busca o valor atualizado direto do banco (evita usar cache desatualizado)
+    const rows = await api('produtos?id=eq.'+produtoId+'&select=visualizacoes&limit=1');
+    const visualizacoes = parseInt((rows&&rows[0]&&rows[0].visualizacoes)||0);
+    // Atualiza em memória também
+    p.visualizacoes = visualizacoes;
 
     // Exibe badge se >= 10
     const badge=document.getElementById('detail-views');
