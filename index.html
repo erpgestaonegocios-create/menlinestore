@@ -1089,7 +1089,12 @@ async function openProduct(id, updateUrl=true){
 async function registrarVisualizacao(produtoId, p){
   try{
     // Controle por sessão: cada produto só conta uma vez por sessão
+    // Chave dupla: sessão + flag de execução em andamento (evita dupla chamada por hashchange)
     const sessKey='mls_view_'+produtoId;
+    const lockKey='mls_view_lock_'+produtoId;
+    if(sessionStorage.getItem(lockKey)) return; // já está processando
+    sessionStorage.setItem(lockKey,'1');
+    setTimeout(()=>sessionStorage.removeItem(lockKey), 2000);
     const jaContou=sessionStorage.getItem(sessKey);
 
     let visualizacoes = parseInt(p.visualizacoes||0);
