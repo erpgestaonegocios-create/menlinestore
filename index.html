@@ -582,37 +582,8 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   <div class="section-inner" style="max-width:700px">
     <h2 class="section-title" style="margin-bottom:8px">Perguntas <span>Frequentes</span></h2>
     <div style="width:48px;height:3px;background:var(--accent2);margin-bottom:32px"></div>
-    <div class="faq-list">
-      <div class="faq-item">
-        <button class="faq-question" onclick="toggleFaq(this)">
-          <span>EM QUANTO TEMPO CHEGA MINHA CAMISA?</span><span class="faq-icon">+</span>
-        </button>
-        <div class="faq-answer"><p>O prazo varia de acordo com a distância, mas normalmente as entregas ocorrem entre 7 a 12 dias úteis.</p></div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="toggleFaq(this)">
-          <span>QUAL A QUALIDADE DOS PRODUTOS?</span><span class="faq-icon">+</span>
-        </button>
-        <div class="faq-answer"><p>Todos os nossos produtos são de qualidade premium para garantir a satisfação de todos os nossos clientes.</p></div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="toggleFaq(this)">
-          <span>COMO ACOMPANHO MEU PEDIDO?</span><span class="faq-icon">+</span>
-        </button>
-        <div class="faq-answer"><p>Se você escolher o método de envio pelos correios, assim que seu pagamento é confirmado já começamos o processo de separação. Ao ser postado, você recebe imediatamente o código de rastreio para acompanhar o trajeto dos seus produtos em tempo real. Se escolher o método de retirada (presencial ou por APP de entrega), você é comunicado via e-mail com todos os detalhes para realizar a retirada.</p></div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="toggleFaq(this)">
-          <span>QUAIS FORMAS DE PAGAMENTOS VOCÊS ACEITAM?</span><span class="faq-icon">+</span>
-        </button>
-        <div class="faq-answer"><p>Aceitamos cartão de crédito (todas as bandeiras) e PIX, e você pode confirmar a melhor opção no momento do checkout antes de finalizar sua compra.</p></div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="toggleFaq(this)">
-          <span>O SITE É SEGURO?</span><span class="faq-icon">+</span>
-        </button>
-        <div class="faq-answer"><p>Sim! Trabalhamos com Mercado Pago, que é altamente indicado e um dos meios mais confiáveis para vendas online no Brasil. Ele oferece um ecossistema completo com processamento de pagamentos seguro, sistema antifraude integrado e diversas facilidades para a gestão dos pagamentos.</p></div>
-      </div>
+    <div class="faq-list" id="faq-dinamico">
+      <div style="text-align:center;padding:40px;color:var(--text3)">Carregando...</div>
     </div>
   </div>
 </section>
@@ -2113,6 +2084,33 @@ function navigate(hash,scroll=true){
   location.hash=hash;
 }
 
+// ── FAQ DINÂMICO (carregado do Supabase) ────────────────────────
+async function carregarFaqSite(){
+  const wrap=document.getElementById('faq-dinamico');
+  if(!wrap)return;
+  wrap.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">Carregando...</div>';
+  try{
+    const res=await fetch(SUPA_URL+'/rest/v1/faq_site?perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&ativo=eq.true&order=ordem.asc',{
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    });
+    const rows=await res.json();
+    if(!rows||!rows.length){
+      wrap.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">Nenhuma pergunta disponível no momento.</div>';
+      return;
+    }
+    wrap.innerHTML=rows.map(r=>`
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          <span>${faqEsc(r.pergunta)}</span><span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer"><p>${faqEsc(r.resposta)}</p></div>
+      </div>`).join('');
+  }catch(e){
+    wrap.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">Não foi possível carregar as perguntas.</div>';
+  }
+}
+function faqEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
 function toggleFaq(btn){
   const item=btn.parentElement;
   const answer=item.querySelector('.faq-answer');
@@ -2147,6 +2145,7 @@ function showSection(name,scroll=true){
       buildCategoryFilters();
     }
   }
+  if(name==='faq') carregarFaqSite();
 }
 
 // Interpreta o hash atual e mostra a seção/produto correto
