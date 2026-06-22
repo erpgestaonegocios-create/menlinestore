@@ -2425,7 +2425,14 @@ async function solicitarCancelamento(compraId,nomeProduto){
       motivo_cancelamento:motivo.trim(),
       cancelamento_solicitado_em:new Date().toISOString()
     })});
-    toast('✅ Solicitação de cancelamento registrada! Em breve entraremos em contato sobre a devolução.','success');
+    // Disparar e-mail de cancelamento recebido + instruções (conforme forma de entrega)
+    try{
+      const det=await api('cliente_compras?id=eq.'+compraId+'&select=forma_entrega,codigo_rastreio,produtos(nome)');
+      const forma=det&&det[0]?det[0].forma_entrega:'correios';
+      const codR=det&&det[0]?det[0].codigo_rastreio:'';
+      if(currentUser.email) await emailCancelamentoRecebido(currentUser.nome||'Cliente',currentUser.email,nomeProduto,forma,codR);
+    }catch(eMail){console.warn('email cancelamento:',eMail);}
+    toast('✅ Solicitação de cancelamento registrada! Enviamos as instruções de devolução para o seu e-mail.','success');
     abrirMeusPedidos();
   }catch(e){
     // Se as colunas de cancelamento ainda não existirem, avisa
@@ -2554,6 +2561,16 @@ async function emailPedidoRecebidoSite(nomeCliente,emailCliente,itens,total){
   if(!tpl)return;
   const itensHtml=itens.map(i=>`<tr><td style="padding:8px;border-bottom:1px solid #eee">${i.nome}${i.cor?' · '+i.cor:''}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.genero||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.tamanho||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.qty}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</td></tr>`).join('');
   const vars={nome_cliente:nomeCliente,itens_tabela:itensHtml,total_pedido:'R$ '+parseFloat(total).toFixed(2).replace('.',',')};
+  return dispararEmail(emailCliente,aplicarVars(tpl.assunto,vars),aplicarVars(tpl.corpo_html,vars));
+}
+
+// E-mail de cancelamento recebido + instruções (escolhe template por forma de entrega)
+async function emailCancelamentoRecebido(nomeCliente,emailCliente,nomeProduto,formaEntrega,codigoRastreio){
+  await carregarTemplates();
+  const tipo=(formaEntrega==='correios')?'cancelamento_correios':'cancelamento_presencial';
+  const tpl=_emailTpls[tipo];
+  if(!tpl){ console.warn('Template '+tipo+' não encontrado'); return; }
+  const vars={nome_cliente:nomeCliente,nome_produto:nomeProduto,codigo_rastreio:codigoRastreio||'—'};
   return dispararEmail(emailCliente,aplicarVars(tpl.assunto,vars),aplicarVars(tpl.corpo_html,vars));
 }
 
