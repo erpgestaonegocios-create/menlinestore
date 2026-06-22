@@ -858,7 +858,7 @@ async function loadProducts(){
     }
     allProducts=data||[];
     // Load stock for each product
-    const saldos=await api('estoque_saldo?select=produto_id,genero,tamanho,quantidade&perfil_codigo=eq.'+encodeURIComponent(PERFIL));
+    const saldos=await api('estoque_saldo?select=produto_id,genero,tamanho,cor,quantidade&perfil_codigo=eq.'+encodeURIComponent(PERFIL));
     allProducts.forEach(p=>{
       p._saldos=(saldos||[]).filter(s=>s.produto_id===p.id);
       p._estoque=p._saldos.reduce((s,r)=>s+parseFloat(r.quantidade||0),0);
@@ -942,8 +942,8 @@ async function openProduct(id, updateUrl=true){
     return;
   }
   currentProductId=idNum;
-  selectedSize=null;selectedGenero=null;selectedQty=1;
-  // Pré-selecionar gênero e/ou tamanho se houver apenas um
+  selectedSize=null;selectedGenero=null;selectedCor=null;selectedQty=1;
+  // Pré-selecionar gênero, tamanho e/ou cor se houver apenas um
   setTimeout(()=>{
     const generoBtns=document.querySelectorAll('#genero-btns .size-btn');
     if(generoBtns.length===1) generoBtns[0].click();
@@ -951,6 +951,10 @@ async function openProduct(id, updateUrl=true){
     setTimeout(()=>{
       const sizeBtns=document.querySelectorAll('#size-btns .size-btn:not(.unavailable)');
       if(sizeBtns.length===1) sizeBtns[0].click();
+      setTimeout(()=>{
+        const corBtns=document.querySelectorAll('#cor-btns .size-btn:not(.unavailable)');
+        if(corBtns.length===1) corBtns[0].click();
+      },100);
     },100);
   },50);
   if(updateUrl) location.hash='produto-'+idNum;
@@ -972,6 +976,12 @@ async function openProduct(id, updateUrl=true){
     return ia-ib;
   });
   const generos=[...new Set(p._saldos.map(s=>s.genero).filter(Boolean))];
+  const cores=[...new Set(p._saldos.map(s=>s.cor).filter(Boolean))];
+  // Mapa de fotos por cor (cruzando imagens_base64 com imagens_cores)
+  let fotosCores=[];
+  try{fotosCores=typeof p.imagens_cores==='string'?JSON.parse(p.imagens_cores):(p.imagens_cores||[]);}catch(e){fotosCores=[];}
+  p._imgsTodas=imgs.slice();
+  p._fotosCores=fotosCores;
   const esgotado=p._estoque===0;
   const preco='R$ '+parseFloat(p.preco_venda||0).toFixed(2).replace('.',',');
   const sizeBtns=tamanhos.map(t=>{
@@ -981,6 +991,10 @@ async function openProduct(id, updateUrl=true){
   const generoBtns=generos.map(g=>{
     const avail=disponivel.some(s=>s.genero===g);
     return `<button class="size-btn${avail?'':' unavailable'}" onclick="selectGenero(this,'${g}')" data-genero="${g}">${g.charAt(0).toUpperCase()+g.slice(1)}</button>`;
+  }).join('');
+  const corBtns=cores.map(c=>{
+    const avail=disponivel.some(s=>s.cor===c);
+    return `<button class="size-btn${avail?'':' unavailable'}" onclick="selectCor(this,'${c.replace(/'/g,"\\'")}')" data-cor="${c}">${c}</button>`;
   }).join('');
   // Thumbnails estilo Netshoes: quadradas, object-fit:contain, fundo claro
   const thumbsHtml=imgs.length>1?imgs.map((im,i)=>`
@@ -1014,6 +1028,7 @@ async function openProduct(id, updateUrl=true){
       ${p.obs_site?`<div style="background:rgba(201,168,76,.15);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--gold)">📢 ${p.obs_site}</div>`:''}
       ${generos.length?`<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Gênero</div><div class="size-selector" id="genero-btns">${generoBtns}</div></div>`:''}
       ${tamanhos.length?`<div id="size-wrap" style="margin-bottom:12px;${generos.length?"display:none":""}"><div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Tamanho</div><div class="size-selector" id="size-btns">${sizeBtns}</div></div>`:''}
+      ${cores.length?`<div id="cor-wrap" style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Cor</div><div class="size-selector" id="cor-btns">${corBtns}</div></div>`:''}
       <div class="qty-selector">
         <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase">Qtd:</div>
         <button class="qty-btn" onclick="changeQty(-1)">−</button>
@@ -1107,6 +1122,7 @@ function setMainImg(thumbEl, src){
 
 let selectedSize=null;
 let selectedGenero=null;
+let selectedCor=null;
 let selectedQty=1;
 let currentProductId=null;
 
@@ -1116,10 +1132,11 @@ function atualizarInfoEstoque(){
   if(!p)return;
   const saldo=p._saldos.find(s=>
     (!selectedGenero||(s.genero||'').toLowerCase()===(selectedGenero||'').toLowerCase())&&
-    (!selectedSize||(s.tamanho||'')===(selectedSize||''))
+    (!selectedSize||(s.tamanho||'')===(selectedSize||''))&&
+    (!selectedCor||(s.cor||'')===(selectedCor||''))
   );
   const maxEstoque=saldo?parseFloat(saldo.quantidade||0):0;
-  const key=`${currentProductId}_${selectedGenero||''}_${selectedSize||''}`;
+  const key=`${currentProductId}_${selectedGenero||''}_${selectedSize||''}_${selectedCor||''}`;
   const noCarrinho=cart.find(i=>i.key===key);
   const qtdNoCarrinho=noCarrinho?noCarrinho.qty:0;
   const disponivel=maxEstoque-qtdNoCarrinho;
@@ -1225,6 +1242,47 @@ function selectGenero(btn,genero){
     if(disponiveis.length===1) disponiveis[0].click();
   }
 }
+function selectCor(btn,cor){
+  document.querySelectorAll('#cor-btns .size-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedCor=cor;
+  trocarFotosPorCor(cor);
+  atualizarInfoEstoque();
+}
+function trocarFotosPorCor(cor){
+  const p=allProducts.find(x=>parseInt(x.id)===parseInt(currentProductId));
+  if(!p)return;
+  const todas=p._imgsTodas||[];
+  const fotosCores=p._fotosCores||[];
+  // Filtrar índices das fotos cuja cor bate; se nenhuma marcada, mantém todas
+  let idxs=[];
+  if(cor){
+    idxs=todas.map((im,i)=>({im,c:(fotosCores[i]||'')})).filter(o=>o.c&&o.c.toLowerCase()===cor.toLowerCase());
+  }
+  const lista=idxs.length?idxs.map(o=>o.im):todas;
+  if(!lista.length)return;
+  // Atualizar imagem principal
+  const mainImg=document.getElementById('detail-main-img');
+  if(mainImg)mainImg.src=lista[0];
+  // Reconstruir miniaturas
+  const wrap=document.getElementById('main-img-wrap');
+  const thumbsContainer=wrap?wrap.parentElement.querySelector('div[style*="overflow-x:auto"]'):null;
+  if(thumbsContainer){
+    if(lista.length>1){
+      thumbsContainer.style.display='flex';
+      thumbsContainer.innerHTML=lista.map((im,i)=>`
+        <div onclick="setMainImg(this,'${im}')" style="
+          width:72px;height:72px;flex-shrink:0;cursor:pointer;
+          border-radius:8px;border:2px solid ${i===0?'var(--accent2)':'var(--border)'};
+          background:#fff;display:flex;align-items:center;justify-content:center;
+          padding:4px;transition:.2s;overflow:hidden;">
+          <img src="${im}" style="width:100%;height:100%;object-fit:contain;display:block;">
+        </div>`).join('');
+    } else {
+      thumbsContainer.style.display='none';
+    }
+  }
+}
 function changeQty(delta){
   if(delta>0){
     // Verificar estoque disponível para a combinação selecionada
@@ -1268,9 +1326,10 @@ function changeQty(delta){
 function addToCart(prodId){
   const p=allProducts.find(x=>x.id===prodId);if(!p)return;
   const msgEl=document.getElementById('detail-stock');
-  // Verificar se produto tem tamanhos disponíveis
+  // Verificar se produto tem variações disponíveis
   const tamanhos=[...new Set((p._saldos||[]).map(s=>s.tamanho).filter(Boolean))];
   const generos=[...new Set((p._saldos||[]).map(s=>s.genero).filter(Boolean))];
+  const cores=[...new Set((p._saldos||[]).map(s=>s.cor).filter(Boolean))];
   // Validar seleção obrigatória de gênero (primeiro)
   if(generos.length>0&&!selectedGenero){
     if(msgEl)msgEl.innerHTML='<span style="color:var(--danger)">⚠️ Selecione um <strong>gênero</strong> antes de adicionar ao carrinho.</span>';
@@ -1281,11 +1340,17 @@ function addToCart(prodId){
     if(msgEl)msgEl.innerHTML='<span style="color:var(--danger)">⚠️ Selecione um <strong>tamanho</strong> antes de adicionar ao carrinho.</span>';
     return;
   }
-  const key=`${prodId}_${selectedGenero||''}_${selectedSize||''}`;
+  // Validar seleção obrigatória de cor (por último)
+  if(cores.length>0&&!selectedCor){
+    if(msgEl)msgEl.innerHTML='<span style="color:var(--danger)">⚠️ Selecione uma <strong>cor</strong> antes de adicionar ao carrinho.</span>';
+    return;
+  }
+  const key=`${prodId}_${selectedGenero||''}_${selectedSize||''}_${selectedCor||''}`;
   // Validar estoque antes de adicionar
   const saldo=p._saldos.find(s=>
     (!selectedGenero||s.genero===selectedGenero)&&
-    (!selectedSize||s.tamanho===selectedSize)
+    (!selectedSize||s.tamanho===selectedSize)&&
+    (!selectedCor||s.cor===selectedCor)
   );
   const maxEstoque=saldo?parseFloat(saldo.quantidade||0):0;
   const existing=cart.find(i=>i.key===key);
@@ -1293,14 +1358,20 @@ function addToCart(prodId){
   if(selectedQty+qtdNoCarrinho>maxEstoque){
     const disponivel=Math.max(0,maxEstoque-qtdNoCarrinho);
     const msgEl=document.getElementById('detail-stock');
-    if(msgEl)msgEl.innerHTML=`<span style="color:var(--danger)">⚠️ Disponível: apenas ${disponivel} unidade${disponivel===1?'':'s'}${selectedSize?' (tam. '+selectedSize+')':''}${selectedGenero?' · '+selectedGenero:''}</span>`;
+    if(msgEl)msgEl.innerHTML=`<span style="color:var(--danger)">⚠️ Disponível: apenas ${disponivel} unidade${disponivel===1?'':'s'}${selectedSize?' (tam. '+selectedSize+')':''}${selectedGenero?' · '+selectedGenero:''}${selectedCor?' · '+selectedCor:''}</span>`;
     return;
   }
+  // Foto representativa: a da cor selecionada, se houver
+  let imgItem=p.imagem_base64||'';
+  if(selectedCor&&p._imgsTodas&&p._fotosCores){
+    const idx=p._fotosCores.findIndex(c=>(c||'').toLowerCase()===selectedCor.toLowerCase());
+    if(idx>=0&&p._imgsTodas[idx])imgItem=p._imgsTodas[idx];
+  }
   if(existing){existing.qty+=selectedQty;}
-  else{cart.push({key,id:p.id,prodId,nome:p.nome,preco:parseFloat(p.preco_venda||0),genero:selectedGenero,tamanho:selectedSize,qty:selectedQty,img:p.imagem_base64||''});}
+  else{cart.push({key,id:p.id,prodId,nome:p.nome,preco:parseFloat(p.preco_venda||0),genero:selectedGenero,tamanho:selectedSize,cor:selectedCor,qty:selectedQty,img:imgItem});}
   saveCart();renderCart();
   toast('✅ Adicionado ao carrinho!','success');
-  selectedSize=null;selectedGenero=null;selectedQty=1;
+  selectedSize=null;selectedGenero=null;selectedCor=null;selectedQty=1;
 }
 
 function cartChangeQty(key, delta){
@@ -1316,7 +1387,8 @@ function cartChangeQty(key, delta){
     if(p&&delta>0){
       const saldo=p._saldos.find(s=>
         (s.genero||'').toLowerCase().trim()===(item.genero||'').toLowerCase().trim()&&
-        (s.tamanho||'').trim()===(item.tamanho||'').trim()
+        (s.tamanho||'').trim()===(item.tamanho||'').trim()&&
+        (s.cor||'').toLowerCase().trim()===(item.cor||'').toLowerCase().trim()
       );
       const maxEstoque=saldo?parseFloat(saldo.quantidade||0):0;
       if(novaQty>maxEstoque){
@@ -1363,7 +1435,7 @@ function renderCart(){
       <div class="cart-item-img">${i.img?`<img src="${i.img}" alt="${i.nome}">`:'<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:28px;opacity:.3">👔</div>'}</div>
       <div class="cart-item-info">
         <div class="cart-item-name">${i.nome}</div>
-        <div class="cart-item-var">${[i.genero,i.tamanho].filter(Boolean).join(' · ')}</div>
+        <div class="cart-item-var">${[i.genero,i.tamanho,i.cor].filter(Boolean).join(' · ')}</div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
           <button onclick="cartChangeQty('${i.key}',-1)" style="width:26px;height:26px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">−</button>
           <span style="font-size:13px;font-weight:600;min-width:20px;text-align:center">${i.qty}</span>
@@ -1435,7 +1507,7 @@ async function openCheckout(){
     </div>
     <div style="margin-bottom:20px">
       <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Resumo do pedido</div>
-      <div id="chk-itens-lista">${cart.map(i=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${i.nome} ${i.genero?'· '+i.genero:''} ${i.tamanho?'· '+i.tamanho:''} (${i.qty}x)</span><span style="font-weight:600">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</span></div>`).join('')}</div>
+      <div id="chk-itens-lista">${cart.map(i=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${i.nome} ${i.genero?'· '+i.genero:''} ${i.tamanho?'· '+i.tamanho:''} ${i.cor?'· '+i.cor:''} (${i.qty}x)</span><span style="font-weight:600">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</span></div>`).join('')}</div>
       <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>🚚 Frete</span><span id="chk-frete-val" style="font-weight:600">—</span></div>
       <div style="display:flex;justify-content:space-between;padding:10px 0 0;font-size:16px;font-weight:700"><span>Total</span><span id="chk-total-val">R$ ${total.toFixed(2).replace('.',',')}</span></div>
       <div id="chk-desconto-info" style="display:none;font-size:12px;color:var(--success);text-align:right;margin-top:4px"></div>
@@ -1557,7 +1629,7 @@ function atualizarTotalCheckout(){
     const precoStr=precoFinal!==precoOriginal
       ?`<span style="font-weight:600;color:var(--success)">R$ ${precoFinal.toFixed(2).replace('.',',')}</span> <span style="text-decoration:line-through;font-size:11px;opacity:.6">R$ ${precoOriginal.toFixed(2).replace('.',',')}</span>`
       :`<span style="font-weight:600">R$ ${precoOriginal.toFixed(2).replace('.',',')}</span>`;
-    return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${i.nome} ${i.genero?'· '+i.genero:''} ${i.tamanho?'· '+i.tamanho:''} (${i.qty}x)</span>${precoStr}</div>`;
+    return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${i.nome} ${i.genero?'· '+i.genero:''} ${i.tamanho?'· '+i.tamanho:''} ${i.cor?'· '+i.cor:''} (${i.qty}x)</span>${precoStr}</div>`;
   }).join('');
   if(itensEl)itensEl.innerHTML=itensHtml;
   // Frete: só se aplica para entrega pelos Correios; retirada/app são gratuitos
@@ -1643,17 +1715,18 @@ async function confirmarPedido(){
   const total=cart.reduce((s,i)=>s+i.preco*i.qty,0)+freteValor;
   try{
     // ETAPA 1: Validar estoque de TODOS os itens antes de gravar qualquer coisa
-    const saldosAtuais=await api('estoque_saldo?select=id,produto_id,genero,tamanho,quantidade&perfil_codigo=eq.'+encodeURIComponent(PERFIL));
+    const saldosAtuais=await api('estoque_saldo?select=id,produto_id,genero,tamanho,cor,quantidade&perfil_codigo=eq.'+encodeURIComponent(PERFIL));
     for(const item of cart){
       const itemProdId=parseInt(item.id||item.prodId);
       const saldo=(saldosAtuais||[]).find(s=>
         parseInt(s.produto_id)===itemProdId&&
         (s.genero||'').toLowerCase().trim()===(item.genero||'').toLowerCase().trim()&&
-        (s.tamanho||'').trim()===(item.tamanho||'').trim()
+        (s.tamanho||'').trim()===(item.tamanho||'').trim()&&
+        (s.cor||'').toLowerCase().trim()===(item.cor||'').toLowerCase().trim()
       );
       const qtdDisp=saldo?parseFloat(saldo.quantidade||0):0;
       if(qtdDisp<item.qty){
-        showMsg(`Estoque insuficiente para "${item.nome}"${item.tamanho?' Tam.'+item.tamanho:''}. Disponível: ${qtdDisp}.`,'error');
+        showMsg(`Estoque insuficiente para "${item.nome}"${item.tamanho?' Tam.'+item.tamanho:''}${item.cor?' '+item.cor:''}. Disponível: ${qtdDisp}.`,'error');
         return;
       }
     }
@@ -1673,7 +1746,7 @@ async function confirmarPedido(){
     // ETAPA 3: Gravar compras, estoque e financeiro — tudo ou nada
     const today=new Date().toISOString().slice(0,10);
     const entregaLabel={'correios':'Correios','retirada':'Retirada presencial','app':'Via aplicativo'}[selectedEntrega]||selectedEntrega;
-    const itensTxt=cart.map(i=>i.nome+(i.genero?' '+i.genero:'')+(i.tamanho?' Tam.'+i.tamanho:'')+' ('+i.qty+'x)').join(', ').slice(0,120);
+    const itensTxt=cart.map(i=>i.nome+(i.genero?' '+i.genero:'')+(i.tamanho?' Tam.'+i.tamanho:'')+(i.cor?' '+i.cor:'')+' ('+i.qty+'x)').join(', ').slice(0,120);
 
     // 3a. Inserir compras — SEM abater estoque e SEM gerar financeiro
     // Estoque e financeiro só são movimentados após confirmação do MP (webhook)
@@ -1690,6 +1763,7 @@ async function confirmarPedido(){
         data_compra:today,
         genero:item.genero||null,
         tamanho:item.tamanho||null,
+        cor:item.cor||null,
         forma_entrega:selectedEntrega,
         forma_pagamento:selectedPayment,
         endereco_entrega:end,
@@ -1754,7 +1828,7 @@ async function confirmarPedido(){
       </div>`;
     // Recarregar saldos de estoque em memória (reflete compra atual)
     try{
-      const saldosAtt=await api('estoque_saldo?select=produto_id,genero,tamanho,quantidade&perfil_codigo=eq.'+encodeURIComponent(PERFIL));
+      const saldosAtt=await api('estoque_saldo?select=produto_id,genero,tamanho,cor,quantidade&perfil_codigo=eq.'+encodeURIComponent(PERFIL));
       allProducts.forEach(p=>{
         p._saldos=(saldosAtt||[]).filter(s=>parseInt(s.produto_id)===parseInt(p.id));
         p._estoque=p._saldos.reduce((s,r)=>s+parseFloat(r.quantidade||0),0);
@@ -2274,7 +2348,7 @@ async function abrirMeusPedidos(){
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
           <div>
             <div style="font-size:15px;font-weight:700;color:var(--text)">${c.produtos?.nome||'Produto'}</div>
-            <div style="font-size:12px;color:var(--text3);margin-top:2px">${[c.genero,c.tamanho].filter(Boolean).join(' · ')} · ${fmtD(c.data_compra)}</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px">${[c.genero,c.tamanho,c.cor].filter(Boolean).join(' · ')} · ${fmtD(c.data_compra)}</div>
           </div>
           <div style="text-align:right">
             <div style="font-size:18px;font-weight:700;color:var(--white)">${fmtV(c.total_pago)}</div>
@@ -2295,7 +2369,7 @@ const MP_FUNC_URL = 'https://uqigoyedyaltwjmfysnu.supabase.co/functions/v1/cleve
 
 async function criarPreferenciaMP(itens, nomeCliente, emailCliente, compraIds, freteValor=0){
   const items = itens.map(i=>({
-    title: i.nome + (i.genero?' '+i.genero:'') + (i.tamanho?' Tam.'+i.tamanho:''),
+    title: i.nome + (i.genero?' '+i.genero:'') + (i.tamanho?' Tam.'+i.tamanho:'') + (i.cor?' '+i.cor:''),
     quantity: i.qty,
     unit_price: parseFloat(i.preco),
     currency_id: 'BRL'
@@ -2374,7 +2448,7 @@ async function emailVendaRealizadaLoja(nomeCliente, codigoCliente, itens, total,
   if(!tpl){ console.warn('Template venda_realizada não encontrado'); return; }
   const entregaLabel={'correios':'📦 Correios','retirada':'🏪 Retirada presencial','app':'🛵 Via aplicativo'}[formaEntrega]||formaEntrega;
   const itensHtml=itens.map(i=>`<tr>
-    <td style="padding:8px;border-bottom:1px solid #eee;font-size:13px">${i.nome}</td>
+    <td style="padding:8px;border-bottom:1px solid #eee;font-size:13px">${i.nome}${i.cor?' · '+i.cor:''}</td>
     <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;font-size:13px">${i.genero||'—'}</td>
     <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;font-size:13px">${i.tamanho||'—'}</td>
     <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;font-size:13px">${i.qty}</td>
@@ -2394,7 +2468,7 @@ async function emailPedidoRecebidoRetirada(nomeCliente,emailCliente,itens,total)
   await carregarTemplates();
   const tpl=_emailTpls['pedido_recebido_retirada'];
   if(!tpl){ console.warn('Template pedido_recebido_retirada não encontrado'); return; }
-  const itensHtml=itens.map(i=>`<tr><td style="padding:8px;border-bottom:1px solid #eee">${i.nome}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.genero||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.tamanho||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.qty}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</td></tr>`).join('');
+  const itensHtml=itens.map(i=>`<tr><td style="padding:8px;border-bottom:1px solid #eee">${i.nome}${i.cor?' · '+i.cor:''}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.genero||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.tamanho||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.qty}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</td></tr>`).join('');
   const vars={nome_cliente:nomeCliente,itens_tabela:itensHtml,total_pedido:'R$ '+parseFloat(total).toFixed(2).replace('.',',')};
   return dispararEmail(emailCliente,aplicarVars(tpl.assunto,vars),aplicarVars(tpl.corpo_html,vars));
 }
@@ -2403,7 +2477,7 @@ async function emailPedidoRecebidoSite(nomeCliente,emailCliente,itens,total){
   await carregarTemplates();
   const tpl=_emailTpls['pedido_recebido_correios'];
   if(!tpl)return;
-  const itensHtml=itens.map(i=>`<tr><td style="padding:8px;border-bottom:1px solid #eee">${i.nome}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.genero||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.tamanho||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.qty}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</td></tr>`).join('');
+  const itensHtml=itens.map(i=>`<tr><td style="padding:8px;border-bottom:1px solid #eee">${i.nome}${i.cor?' · '+i.cor:''}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.genero||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.tamanho||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.qty}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">R$ ${(i.preco*i.qty).toFixed(2).replace('.',',')}</td></tr>`).join('');
   const vars={nome_cliente:nomeCliente,itens_tabela:itensHtml,total_pedido:'R$ '+parseFloat(total).toFixed(2).replace('.',',')};
   return dispararEmail(emailCliente,aplicarVars(tpl.assunto,vars),aplicarVars(tpl.corpo_html,vars));
 }
