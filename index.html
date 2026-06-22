@@ -476,6 +476,26 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
   </div>
 </div>
 
+<!-- MODAL CANCELAR / DEVOLVER PEDIDO -->
+<div class="modal-overlay" id="cancelar-pedido-modal" style="z-index:970">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-header">
+      <span style="font-size:16px;font-weight:700">🔄 Cancelar / Devolver pedido</span>
+      <button class="modal-close" onclick="closeModal('cancelar-pedido-modal')">×</button>
+    </div>
+    <div class="modal-body" style="padding:20px">
+      <p id="cancelar-pedido-sub" style="font-size:13px;color:var(--text2);line-height:1.6;margin:0 0 14px"></p>
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">Motivo do cancelamento <span style="color:var(--danger)">*</span></label>
+      <textarea id="cancelar-motivo" rows="3" placeholder="Ex: desisti da compra, produto com defeito, tamanho errado..." style="width:100%;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit"></textarea>
+      <div style="font-size:11px;color:var(--text3);line-height:1.5;margin-top:8px">Ao confirmar, você deverá devolver o produto. O estorno do valor será feito após a conferência da devolução, e enviaremos as instruções por e-mail.</div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button class="btn-secondary" style="flex:1" onclick="closeModal('cancelar-pedido-modal')">Voltar</button>
+        <button class="btn-primary" id="btn-confirmar-cancelamento" style="flex:1;background:var(--danger)" onclick="confirmarSolicitacaoCancelamento()">Confirmar cancelamento</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- BACKDROP -->
 <div class="backdrop" id="backdrop" onclick="closeAll()"></div>
 
@@ -2413,16 +2433,30 @@ async function abrirMeusPedidos(){
   }catch(e){wrap.innerHTML='<div class="empty-state"><p style="color:var(--danger)">Erro ao carregar pedidos.</p></div>';}
 }
 
-async function solicitarCancelamento(compraId,nomeProduto){
+function solicitarCancelamento(compraId,nomeProduto){
   if(!currentUser){toast('Faça login para solicitar o cancelamento.','error');return;}
-  const motivo=prompt('Por favor, informe o motivo do cancelamento de "'+nomeProduto+'":');
-  if(motivo===null)return; // usuário cancelou o prompt
-  if(!motivo.trim()){toast('É necessário informar o motivo.','error');return;}
-  if(!confirm('Confirmar a solicitação de cancelamento?\n\nVocê deverá devolver o produto. O estorno do valor será feito após a conferência da devolução.'))return;
+  window._cancelarCompraId=compraId;
+  window._cancelarNomeProduto=nomeProduto;
+  const sub=document.getElementById('cancelar-pedido-sub');
+  if(sub)sub.textContent='Você está solicitando o cancelamento de "'+nomeProduto+'".';
+  const mot=document.getElementById('cancelar-motivo');if(mot)mot.value='';
+  const btn=document.getElementById('btn-confirmar-cancelamento');if(btn){btn.disabled=false;btn.textContent='Confirmar cancelamento';}
+  document.getElementById('cancelar-pedido-modal').classList.add('open');
+  setTimeout(()=>{if(mot)mot.focus();},60);
+}
+
+async function confirmarSolicitacaoCancelamento(){
+  const compraId=window._cancelarCompraId;
+  const nomeProduto=window._cancelarNomeProduto||'Produto';
+  if(!compraId)return;
+  const motivo=(document.getElementById('cancelar-motivo')?.value||'').trim();
+  if(!motivo){toast('É necessário informar o motivo.','error');return;}
+  const btn=document.getElementById('btn-confirmar-cancelamento');
+  if(btn){btn.disabled=true;btn.textContent='Processando...';}
   try{
     await api('cliente_compras?id=eq.'+compraId,{method:'PATCH',body:JSON.stringify({
       status_entrega:'cancelamento_solicitado',
-      motivo_cancelamento:motivo.trim(),
+      motivo_cancelamento:motivo,
       cancelamento_solicitado_em:new Date().toISOString()
     })});
     // Disparar e-mail de cancelamento recebido + instruções (conforme forma de entrega)
@@ -2432,15 +2466,16 @@ async function solicitarCancelamento(compraId,nomeProduto){
       const codR=det&&det[0]?det[0].codigo_rastreio:'';
       if(currentUser.email) await emailCancelamentoRecebido(currentUser.nome||'Cliente',currentUser.email,nomeProduto,forma,codR);
     }catch(eMail){console.warn('email cancelamento:',eMail);}
+    closeModal('cancelar-pedido-modal');
     toast('✅ Solicitação de cancelamento registrada! Enviamos as instruções de devolução para o seu e-mail.','success');
     abrirMeusPedidos();
   }catch(e){
-    // Se as colunas de cancelamento ainda não existirem, avisa
     if((e.message||'').toLowerCase().includes('motivo_cancelamento')||(e.message||'').toLowerCase().includes('cancelamento_solicitado_em')){
       toast('Erro: o banco ainda não está preparado para cancelamentos. Avise o administrador.','error');
     } else {
       toast('Erro ao solicitar cancelamento: '+e.message,'error');
     }
+    if(btn){btn.disabled=false;btn.textContent='Confirmar cancelamento';}
   }
 }
 
