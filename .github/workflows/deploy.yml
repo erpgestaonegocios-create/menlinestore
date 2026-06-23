@@ -1,0 +1,47 @@
+name: Publicar site (gera páginas de produto + deploy)
+
+# Roda quando você envia alterações para o branch main
+# (é o que acontece quando você publica pelo GitHub como já faz hoje).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # permite rodar manualmente pelo botão "Run workflow"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Gerar páginas de produto (lê o Supabase)
+        env:
+          SUPA_KEY: ${{ secrets.SUPA_KEY }}
+          SUPA_URL: https://uqigoyedyaltwjmfysnu.supabase.co
+          PERFIL: lojista
+          SITE_URL: https://menlinestore.com.br
+          OG_IMAGE: https://menlinestore.com.br/logo.png
+        run: node gerar-paginas.js
+
+      - name: Preparar artefato do site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
