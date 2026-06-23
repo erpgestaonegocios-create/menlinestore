@@ -99,10 +99,14 @@ function paginaProduto(p) {
 
 <link rel="canonical" href="${urlProduto}">
 
-<!-- Visitante humano é redirecionado para a loja no produto certo.
-     O robô da Meta lê as tags acima e ignora o redirect. -->
-<script>window.location.replace(${JSON.stringify(destino)});</script>
-<meta http-equiv="refresh" content="0; url=${destino}">
+<!-- Redireciona SOMENTE o visitante humano (via JavaScript) para a loja.
+     O robô da Meta não executa JS, então lê as tags acima e para aqui.
+     IMPORTANTE: não usar meta refresh — o robô da Meta segue o refresh
+     e acabaria lendo a home em vez do produto. -->
+<script>
+  // pequeno atraso para garantir que crawlers leiam as tags primeiro
+  setTimeout(function(){ window.location.replace(${JSON.stringify(destino)}); }, 100);
+</script>
 </head>
 <body style="font-family:Arial,sans-serif;background:#0d0d0d;color:#fff;text-align:center;padding:60px 20px">
   <h1>${titulo}</h1>
