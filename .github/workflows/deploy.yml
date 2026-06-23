@@ -6,6 +6,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:   # permite rodar manualmente pelo botão "Run workflow"
+  schedule:
+    - cron: '0 * * * *'   # roda automaticamente no minuto 0 de cada hora
 
 permissions:
   contents: read
