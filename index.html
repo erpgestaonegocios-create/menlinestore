@@ -1491,18 +1491,20 @@ function saveCart(){
   localStorage.setItem('mls_cart',JSON.stringify(cart));
 }
 
+// Calcular preço com desconto PIX se aplicável (escopo global)
+function calcPreco(item){
+  const p=allProducts.find(x=>parseInt(x.id)===parseInt(item.id||item.prodId));
+  if(selectedPayment==='pix'&&p?.obs_site&&parseFloat(p?.desconto_pix||0)>0){
+    return Math.max(0, item.preco - parseFloat(p.desconto_pix));
+  }
+  return item.preco;
+}
+
 function renderCart(){
   const list=document.getElementById('cart-items-list');
   const footer=document.getElementById('cart-footer');
   const badge=document.getElementById('cart-badge');
   // Calcular total com desconto PIX se aplicável
-  const calcPreco=(item)=>{
-    const p=allProducts.find(x=>parseInt(x.id)===parseInt(item.id||item.prodId));
-    if(selectedPayment==='pix'&&p?.obs_site&&parseFloat(p?.desconto_pix||0)>0){
-      return Math.max(0, item.preco - parseFloat(p.desconto_pix));
-    }
-    return item.preco;
-  };
   const total=cart.reduce((s,i)=>s+calcPreco(i)*i.qty,0);
   const count=cart.reduce((s,i)=>s+i.qty,0);
   badge.textContent=count;
