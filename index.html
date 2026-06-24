@@ -1831,8 +1831,14 @@ async function confirmarPedido(){
     const entregaLabel={'correios':'Correios','retirada':'Retirada presencial','app':'Via aplicativo'}[selectedEntrega]||selectedEntrega;
     const itensTxt=cart.map(i=>i.nome+(i.genero?' '+i.genero:'')+(i.tamanho?' Tam.'+i.tamanho:'')+(i.cor?' '+i.cor:'')+' ('+i.qty+'x)').join(', ').slice(0,120);
 
-    // 3a. Inserir compras — SEM abater estoque e SEM gerar financeiro
-    // Estoque e financeiro só são movimentados após confirmação do MP (webhook)
+    const cartSnapshot=[...cart];
+    const chkBody=document.getElementById('checkout-body');
+
+    // 3a. Inserir compras — SEM abater estoque e SEM gerar financeiro.
+    // Estoque e financeiro só são movimentados após confirmação do MP (webhook).
+    // Os IDs gerados aqui são usados como external_reference na preferência do MP;
+    // se a preferência falhar, estas compras são REMOVIDAS (rollback) logo abaixo,
+    // para não deixar pedidos órfãos a cada tentativa.
     let primeiroItem=true;
     for(const item of cart){
       await api('cliente_compras',{method:'POST',body:JSON.stringify({
@@ -1861,7 +1867,52 @@ async function confirmarPedido(){
       })});
       primeiroItem=false;
     }
-    // 3b. Registrar o frete para controle no painel "Fretes" do Financeiro
+
+    // 3b. Coletar IDs das compras recém-criadas (serão o external_reference)
+    const comprasIds=[];
+    try{
+      const ultimas=await api('cliente_compras?cliente_id=eq.'+clienteId+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&order=id.desc&limit='+cart.length+'&select=id');
+      (ultimas||[]).forEach(c=>comprasIds.push(c.id));
+    }catch(e){}
+
+    // Helper de rollback: remove as compras criadas se o pagamento não iniciar
+    const rollbackCompras=async()=>{
+      for(const id of comprasIds){
+        try{ await api('cliente_compras?id=eq.'+id,{method:'DELETE'}); }catch(_){}
+      }
+    };
+
+    // ETAPA 4: Criar a preferência no Mercado Pago
+    chkBody.innerHTML=`<div style="text-align:center;padding:32px 0"><div class="spinner" style="margin:0 auto 16px"></div><p style="color:var(--text2);font-size:14px">Preparando pagamento seguro...</p></div>`;
+    let pref=null, mpUrl=null;
+    try{
+      pref=await criarPreferenciaMP(cartSnapshot, nome, email, comprasIds, freteValor);
+      mpUrl=pref&&(pref.init_point||pref.sandbox_init_point);
+    }catch(e){
+      console.error('MP erro:',e);
+      pref={ _erro: e.message||String(e) };
+    }
+
+    // Se o MP NÃO devolveu link de pagamento: rollback + erro real ao cliente.
+    if(!mpUrl){
+      const detalhe=(pref&&(pref._erro||pref.message||pref.error))||'';
+      console.error('MP sem init_point. Resposta:',pref);
+      await rollbackCompras();
+      chkBody.innerHTML=`
+        <div style="text-align:center;padding:16px 0 24px">
+          <div style="font-size:56px;margin-bottom:12px">⚠️</div>
+          <h2 style="font-size:24px;margin-bottom:8px">Não foi possível iniciar o pagamento</h2>
+          <p style="color:var(--text2);font-size:14px;max-width:400px;margin:0 auto">Houve uma falha ao conectar com o Mercado Pago e seu pedido <b>não</b> foi cobrado. Nenhuma compra foi registrada. Tente novamente em instantes; se persistir, fale com a loja.</p>
+          ${detalhe?`<p style="color:var(--text2);font-size:11px;opacity:.6;margin-top:10px">cód.: ${String(detalhe).slice(0,120)}</p>`:''}
+        </div>
+        <div style="display:grid;gap:10px;margin-top:8px">
+          <button class="btn-primary" onclick="confirmarPedido()">Tentar novamente</button>
+          <button class="btn-secondary" onclick="closeModal('checkout-modal')">Fechar</button>
+        </div>`;
+      return;
+    }
+
+    // 5a. Pagamento iniciado com sucesso — registrar frete no Financeiro
     if(freteValor>0){
       try{
         await api('fretes_pedidos',{method:'POST',body:JSON.stringify({
@@ -1873,51 +1924,15 @@ async function confirmarPedido(){
         })});
       }catch(e){ console.warn('Erro ao registrar frete no financeiro:',e); }
     }
-    // 4. Coletar IDs das compras criadas
-    const comprasIds=[];
-    try{
-      const ultimas=await api('cliente_compras?cliente_id=eq.'+clienteId+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&order=id.desc&limit='+cart.length+'&select=id');
-      (ultimas||[]).forEach(c=>comprasIds.push(c.id));
-    }catch(e){}
 
-    // 5. Disparar emails ANTES do redirect (guardar cart em variável pois será limpo)
-    const cartSnapshot=[...cart];
-    const msgEntrega={'correios':'Correios','retirada':'Retirada presencial','app':'Via aplicativo'}[selectedEntrega]||selectedEntrega;
+    // 5b. Disparar emails antes do redirect
     try{ if(selectedEntrega==='correios'){ await emailPedidoRecebidoSite(nome,email,cartSnapshot,total); } else { await emailPedidoRecebidoRetirada(nome,email,cartSnapshot,total); } }catch(e){ console.error('email cliente:',e); }
     try{ await emailVendaRealizadaLoja(nome, clienteId, cartSnapshot, total, selectedEntrega); }catch(e){ console.error('email loja:',e); }
 
-    // 6. Redirecionar para Mercado Pago
-    const chkBody=document.getElementById('checkout-body');
-    chkBody.innerHTML=`<div style="text-align:center;padding:32px 0"><div class="spinner" style="margin:0 auto 16px"></div><p style="color:var(--text2);font-size:14px">Preparando pagamento seguro...</p></div>`;
-    try{
-      const pref=await criarPreferenciaMP(cartSnapshot, nome, email, comprasIds, freteValor);
-      const mpUrl=pref.sandbox_init_point||pref.init_point;
-      if(mpUrl){
-        cart=[];saveCart();renderCart();
-        window.location.href=mpUrl;
-        return;
-      }
-    }catch(e){ console.error('MP erro:',e); }
-    // Fallback se MP falhar
-    const msgE2=selectedEntrega==='correios'?'Finalize o pagamento para confirmarmos seu pedido.':'Seu pedido está sendo preparado e você será informado sobre os próximos passos.';
-    chkBody.innerHTML=`
-      <div style="text-align:center;padding:16px 0 24px">
-        <div style="font-size:56px;margin-bottom:12px">🎉</div>
-        <h2 style="font-size:28px;margin-bottom:8px">Pedido registrado!</h2>
-        <p style="color:var(--text2);font-size:14px;max-width:380px;margin:0 auto">${msgE2}</p>
-      </div>
-      <div style="display:grid;gap:10px;margin-top:8px">
-        <button class="btn-secondary" onclick="cart=[];saveCart();renderCart();closeModal('checkout-modal');">Fechar</button>
-      </div>`;
-    // Recarregar saldos de estoque em memória (reflete compra atual)
-    try{
-      const saldosAtt=await api('estoque_saldo?select=produto_id,genero,tamanho,cor,quantidade&perfil_codigo=eq.'+encodeURIComponent(PERFIL));
-      allProducts.forEach(p=>{
-        p._saldos=(saldosAtt||[]).filter(s=>parseInt(s.produto_id)===parseInt(p.id));
-        p._estoque=p._saldos.reduce((s,r)=>s+parseFloat(r.quantidade||0),0);
-      });
-    }catch(e){ console.warn('Erro ao atualizar saldos:',e); }
+    // 6. Redirecionar para o Mercado Pago
     cart=[];saveCart();renderCart();
+    window.location.href=mpUrl;
+    return;
   }catch(e){showMsg('Erro ao processar pedido: '+e.message,'error');}
 }
 
@@ -2517,7 +2532,7 @@ async function criarPreferenciaMP(itens, nomeCliente, emailCliente, compraIds, f
   const items = itens.map(i=>({
     title: i.nome + (i.genero?' '+i.genero:'') + (i.tamanho?' Tam.'+i.tamanho:'') + (i.cor?' '+i.cor:''),
     quantity: i.qty,
-    unit_price: parseFloat(i.preco),
+    unit_price: parseFloat(calcPreco(i)),
     currency_id: 'BRL'
   }));
   if(freteValor>0){
@@ -2530,7 +2545,7 @@ async function criarPreferenciaMP(itens, nomeCliente, emailCliente, compraIds, f
   }
   const body = {
     items,
-    payer: { name: nomeCliente, email: emailCliente },
+    payer: { name: nomeCliente, email: (emailCliente||'').trim().toLowerCase() },
     back_urls: {
       success: 'https://menlinestore.com.br/#pagamento-aprovado',
       failure: 'https://menlinestore.com.br/#pagamento-recusado',
@@ -2539,7 +2554,8 @@ async function criarPreferenciaMP(itens, nomeCliente, emailCliente, compraIds, f
     auto_return: 'approved',
     external_reference: compraIds.join(','),
     payment_methods: {
-      excluded_payment_types: [],
+      // Loja oferece apenas PIX e Cartão — boleto e outros NÃO devem aparecer no MP
+      excluded_payment_types: [ { id: 'ticket' }, { id: 'atm' } ],
       installments: 12
     }
   };
