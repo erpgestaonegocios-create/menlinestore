@@ -1887,7 +1887,10 @@ async function confirmarPedido(){
     let pref=null, mpUrl=null;
     try{
       pref=await criarPreferenciaMP(cartSnapshot, nome, email, comprasIds, freteValor);
-      mpUrl=pref&&(pref.init_point||pref.sandbox_init_point);
+      // SEMPRE usar o ambiente de PRODUÇÃO (init_point).
+      // Nunca usar sandbox_init_point — isso jogaria o cliente no ambiente de TESTE,
+      // onde os pagamentos (PIX, cartão, boleto) não se concluem de verdade.
+      mpUrl=pref&&pref.init_point;
     }catch(e){
       console.error('MP erro:',e);
       pref={ _erro: e.message||String(e) };
