@@ -2288,6 +2288,11 @@ async function salvarNovaSenha(){
       // Volta para a aba de login com o e-mail preenchido
       authTab('login');
       const le=document.getElementById('login-email');if(le)le.value=_recEmail;
+      // Limpar a senha antiga e qualquer mensagem de erro anterior, para o cliente
+      // entrar direto com a nova senha sem confusão
+      const ls=document.getElementById('login-senha');if(ls)ls.value='';
+      const lm=document.getElementById('login-msg');if(lm){lm.style.display='none';lm.innerHTML='';lm.className='form-msg';}
+      if(ls)ls.focus();
     }else{
       _recMsg('rec-msg-3',(data&&data.erro)||'Não foi possível redefinir. O código pode ter expirado.','error');
     }
