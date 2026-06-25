@@ -507,6 +507,51 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
 <!-- BACKDROP -->
 <div class="backdrop" id="backdrop" onclick="closeAll()"></div>
 
+<!-- MODAL RECUPERAR SENHA (3 etapas no padrão do site) -->
+<div class="modal-overlay" id="recuperar-senha-modal" style="z-index:975">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <span style="font-size:16px;font-weight:700">🔑 Recuperar senha</span>
+      <button class="modal-close" onclick="fecharRecuperarSenha()">×</button>
+    </div>
+    <div class="modal-body" style="padding:20px">
+
+      <!-- Etapa 1: pedir e-mail -->
+      <div id="rec-etapa-email">
+        <p style="font-size:13px;color:var(--text2);line-height:1.6;margin:0 0 14px">Informe o e-mail do seu cadastro. Enviaremos um código de verificação de 6 dígitos.</p>
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">E-mail</label>
+        <input type="email" id="rec-email" placeholder="seu@email.com" style="width:100%;box-sizing:border-box;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
+        <div id="rec-msg-1" class="form-msg" style="display:none;margin-top:10px"></div>
+        <button class="btn-primary" id="rec-btn-enviar" style="width:100%;padding:12px;margin-top:16px" onclick="enviarCodigoRecuperacao()">Enviar código →</button>
+      </div>
+
+      <!-- Etapa 2: digitar código -->
+      <div id="rec-etapa-codigo" style="display:none">
+        <p style="font-size:13px;color:var(--text2);line-height:1.6;margin:0 0 14px">Enviamos um código de 6 dígitos para <strong id="rec-email-exibe"></strong>. Verifique sua caixa de entrada e o spam.</p>
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">Código de verificação</label>
+        <input type="text" id="rec-codigo" inputmode="numeric" maxlength="6" placeholder="000000" style="width:100%;box-sizing:border-box;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:22px;letter-spacing:8px;text-align:center;outline:none;font-weight:700" oninput="this.value=this.value.replace(/\D/g,'')">
+        <div id="rec-msg-2" class="form-msg" style="display:none;margin-top:10px"></div>
+        <button class="btn-primary" id="rec-btn-validar" style="width:100%;padding:12px;margin-top:16px" onclick="validarCodigoRecuperacao()">Validar código →</button>
+        <div style="text-align:center;margin-top:12px">
+          <a href="javascript:void(0)" onclick="enviarCodigoRecuperacao(true)" style="color:var(--text3);font-size:12px;text-decoration:none">Reenviar código</a>
+        </div>
+      </div>
+
+      <!-- Etapa 3: nova senha -->
+      <div id="rec-etapa-senha" style="display:none">
+        <p style="font-size:13px;color:var(--text2);line-height:1.6;margin:0 0 14px">Código confirmado! Agora defina sua nova senha.</p>
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">Nova senha</label>
+        <input type="password" id="rec-nova-senha" placeholder="Mínimo 6 caracteres" style="width:100%;box-sizing:border-box;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin:12px 0 6px">Confirmar nova senha</label>
+        <input type="password" id="rec-nova-senha2" placeholder="Repita a senha" style="width:100%;box-sizing:border-box;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
+        <div id="rec-msg-3" class="form-msg" style="display:none;margin-top:10px"></div>
+        <button class="btn-primary" id="rec-btn-salvar" style="width:100%;padding:12px;margin-top:16px" onclick="salvarNovaSenha()">Salvar nova senha →</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- CART SIDEBAR -->
 <div class="cart-sidebar" id="cart-sidebar">
   <div class="cart-header">
@@ -706,6 +751,9 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
           <div class="form-group"><label>Senha</label><input type="password" id="login-senha" placeholder="••••••••"></div>
           <div id="login-msg" class="form-msg"></div>
           <button class="btn-primary" style="width:100%;padding:12px" onclick="fazerLogin()">Entrar →</button>
+          <div style="text-align:center;margin-top:14px">
+            <a href="javascript:void(0)" onclick="abrirRecuperarSenha()" style="color:var(--accent);font-size:13px;text-decoration:none;cursor:pointer">Esqueci minha senha</a>
+          </div>
         </div>
         <!-- REGISTER -->
         <div id="auth-register" style="display:none">
@@ -2127,6 +2175,127 @@ async function fazerLogin(){
     toast('👋 Bem-vindo, '+currentUser.nome.split(' ')[0]+'!','success');
     if(pendingCheckout){pendingCheckout=false;setTimeout(()=>openCheckout(),300);}
   }catch(e){showMsg('Erro: '+e.message,'error');}
+}
+
+// ── RECUPERAÇÃO DE SENHA (código por e-mail, validado no servidor) ──
+const REC_FUNC_URL='https://uqigoyedyaltwjmfysnu.supabase.co/functions/v1/recuperar-senha';
+let _recEmail='';
+
+function abrirRecuperarSenha(){
+  _recEmail='';
+  // Pré-preencher com o e-mail digitado no login, se houver
+  const loginEmail=document.getElementById('login-email')?.value?.trim()||'';
+  document.getElementById('rec-email').value=loginEmail;
+  document.getElementById('rec-codigo').value='';
+  document.getElementById('rec-nova-senha').value='';
+  document.getElementById('rec-nova-senha2').value='';
+  ['rec-msg-1','rec-msg-2','rec-msg-3'].forEach(id=>{const m=document.getElementById(id);if(m)m.style.display='none';});
+  document.getElementById('rec-etapa-email').style.display='block';
+  document.getElementById('rec-etapa-codigo').style.display='none';
+  document.getElementById('rec-etapa-senha').style.display='none';
+  document.getElementById('recuperar-senha-modal').classList.add('open');
+}
+function fecharRecuperarSenha(){ closeModal('recuperar-senha-modal'); }
+
+function _recMsg(id,texto,tipo){
+  const m=document.getElementById(id);
+  if(!m)return;
+  m.style.display='block';
+  m.className='form-msg '+(tipo||'error');
+  m.innerHTML=texto;
+}
+
+async function _recApi(acao,payload){
+  const res=await fetch(REC_FUNC_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY},
+    body:JSON.stringify(Object.assign({acao,perfil_codigo:PERFIL},payload))
+  });
+  const data=await res.json().catch(()=>({}));
+  return {ok:res.ok,status:res.status,data};
+}
+
+// Etapa 1 → enviar código
+async function enviarCodigoRecuperacao(reenvio){
+  const email=document.getElementById('rec-email').value.trim();
+  if(!email||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){_recMsg('rec-msg-1','Informe um e-mail válido.','error');return;}
+  const btn=document.getElementById('rec-btn-enviar');
+  const btnR=document.querySelector('#rec-etapa-codigo a');
+  if(btn)btn.disabled=true;
+  const alvoMsg=reenvio?'rec-msg-2':'rec-msg-1';
+  _recMsg(alvoMsg,'Enviando código...','info');
+  try{
+    const {ok,data}=await _recApi('solicitar',{email});
+    // Por segurança, a resposta é sempre genérica (não revela se o e-mail existe)
+    if(ok){
+      _recEmail=email;
+      document.getElementById('rec-email-exibe').textContent=email;
+      document.getElementById('rec-etapa-email').style.display='none';
+      document.getElementById('rec-etapa-senha').style.display='none';
+      document.getElementById('rec-etapa-codigo').style.display='block';
+      _recMsg('rec-msg-2','Se este e-mail tiver cadastro, o código foi enviado. Verifique sua caixa de entrada e o spam.','success');
+      document.getElementById('rec-codigo').focus();
+    }else{
+      _recMsg(alvoMsg,(data&&data.erro)||'Não foi possível enviar o código. Tente novamente.','error');
+    }
+  }catch(e){
+    _recMsg(alvoMsg,'Erro de conexão. Tente novamente.','error');
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+}
+
+// Etapa 2 → validar código
+async function validarCodigoRecuperacao(){
+  const codigo=document.getElementById('rec-codigo').value.trim();
+  if(codigo.length!==6){_recMsg('rec-msg-2','Digite os 6 dígitos do código.','error');return;}
+  const btn=document.getElementById('rec-btn-validar');
+  if(btn)btn.disabled=true;
+  _recMsg('rec-msg-2','Validando...','info');
+  try{
+    const {ok,data}=await _recApi('validar',{email:_recEmail,codigo});
+    if(ok&&data&&data.valido){
+      document.getElementById('rec-etapa-codigo').style.display='none';
+      document.getElementById('rec-etapa-senha').style.display='block';
+      document.getElementById('rec-nova-senha').focus();
+    }else{
+      _recMsg('rec-msg-2',(data&&data.erro)||'Código inválido ou expirado.','error');
+    }
+  }catch(e){
+    _recMsg('rec-msg-2','Erro de conexão. Tente novamente.','error');
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+}
+
+// Etapa 3 → salvar nova senha
+async function salvarNovaSenha(){
+  const codigo=document.getElementById('rec-codigo').value.trim();
+  const s1=document.getElementById('rec-nova-senha').value;
+  const s2=document.getElementById('rec-nova-senha2').value;
+  if(!s1||s1.length<6){_recMsg('rec-msg-3','A senha deve ter no mínimo 6 caracteres.','error');return;}
+  if(s1!==s2){_recMsg('rec-msg-3','As senhas não conferem.','error');return;}
+  const btn=document.getElementById('rec-btn-salvar');
+  if(btn)btn.disabled=true;
+  _recMsg('rec-msg-3','Salvando...','info');
+  try{
+    // O hash é feito aqui (mesmo padrão do cadastro/login); o servidor só grava
+    const senhaHash=await sha256(s1);
+    const {ok,data}=await _recApi('redefinir',{email:_recEmail,codigo,senha_hash:senhaHash});
+    if(ok&&data&&data.sucesso){
+      closeModal('recuperar-senha-modal');
+      toast('✅ Senha redefinida com sucesso! Faça login com a nova senha.','success');
+      // Volta para a aba de login com o e-mail preenchido
+      authTab('login');
+      const le=document.getElementById('login-email');if(le)le.value=_recEmail;
+    }else{
+      _recMsg('rec-msg-3',(data&&data.erro)||'Não foi possível redefinir. O código pode ter expirado.','error');
+    }
+  }catch(e){
+    _recMsg('rec-msg-3','Erro de conexão. Tente novamente.','error');
+  }finally{
+    if(btn)btn.disabled=false;
+  }
 }
 
 async function criarConta(){
