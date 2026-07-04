@@ -2139,7 +2139,7 @@ async function fazerLogin(){
   const senha=document.getElementById('login-senha').value;
   const msg=document.getElementById('login-msg');
   const showMsg=(t,tp)=>{msg.style.display='block';msg.className='form-msg '+tp;msg.innerHTML=t;};
-  if(!email||!senha){showMsg('Preencha e-mail e senha.','error');return;}
+  if(!email){showMsg('Preencha o e-mail.','error');return;}
   try{
     // 1. Verificar se o email existe
     const emailRows=await api('clientes?email=eq.'+encodeURIComponent(email)+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&select=id,senha_hash');
@@ -2167,7 +2167,8 @@ async function fazerLogin(){
       showMsg('Seu e-mail está cadastrado, mas ainda não possui uma senha associada. Clique em <strong>"Esqueci minha senha"</strong> para definir sua senha e acessar sua conta.','error');
       return;
     }
-    // 2. Verificar senha (comparar hash)
+    // 2. Verificar senha (comparar hash) — só chega aqui se tem senha_hash
+    if(!senha){showMsg('Preencha a senha.','error');return;}
     const senhaHash=await sha256(senha);
     const rows=await api('clientes?email=eq.'+encodeURIComponent(email)+'&senha_hash=eq.'+encodeURIComponent(senhaHash)+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&select=id,nome,email,telefone,cep,endereco,cidade,estado');
     if(!rows||!rows.length){showMsg('Senha incorreta. Tente novamente.','error');return;}
