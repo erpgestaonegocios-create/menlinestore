@@ -2142,7 +2142,7 @@ async function fazerLogin(){
   if(!email||!senha){showMsg('Preencha e-mail e senha.','error');return;}
   try{
     // 1. Verificar se o email existe
-    const emailRows=await api('clientes?email=eq.'+encodeURIComponent(email)+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&select=id');
+    const emailRows=await api('clientes?email=eq.'+encodeURIComponent(email)+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&select=id,senha_hash');
     if(!emailRows||!emailRows.length){
       // Email não cadastrado — redirecionar para criar conta com countdown
       let sec=3;
@@ -2160,6 +2160,11 @@ async function fazerLogin(){
           showMsg(`Você ainda não tem cadastro. Redirecionando para criar conta em <strong>${sec}s</strong>...`,'success');
         }
       },1000);
+      return;
+    }
+    // 1.5. Verificar se o cadastro possui senha definida
+    if(!emailRows[0].senha_hash){
+      showMsg('Seu e-mail está cadastrado, mas ainda não possui uma senha associada. Clique em <strong>"Esqueci minha senha"</strong> para definir sua senha e acessar sua conta.','error');
       return;
     }
     // 2. Verificar senha (comparar hash)
