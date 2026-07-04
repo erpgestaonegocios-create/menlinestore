@@ -747,7 +747,7 @@ footer{background:var(--surface);border-top:1px solid var(--border);padding:48px
         </div>
         <!-- LOGIN -->
         <div id="auth-login">
-          <div class="form-group"><label>E-mail</label><input type="email" id="login-email" placeholder="seu@email.com"></div>
+          <div class="form-group"><label>E-mail</label><input type="email" id="login-email" placeholder="seu@email.com" onblur="verificarEmailLogin()"></div>
           <div class="form-group"><label>Senha</label><input type="password" id="login-senha" placeholder="••••••••"></div>
           <div id="login-msg" class="form-msg"></div>
           <button class="btn-primary" style="width:100%;padding:12px" onclick="fazerLogin()">Entrar →</button>
@@ -2132,6 +2132,23 @@ function authTab(tab){
   document.querySelectorAll('.auth-tab').forEach((b,i)=>b.classList.toggle('active',i===(tab==='login'?0:1)));
   document.getElementById('auth-login').style.display=tab==='login'?'block':'none';
   document.getElementById('auth-register').style.display=tab==='register'?'block':'none';
+}
+
+async function verificarEmailLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const msg=document.getElementById('login-msg');
+  const showMsg=(t,tp)=>{msg.style.display='block';msg.className='form-msg '+tp;msg.innerHTML=t;};
+  const hideMsg=()=>{msg.style.display='none';};
+  if(!email)return;
+  try{
+    const emailRows=await api('clientes?email=eq.'+encodeURIComponent(email)+'&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&select=id,senha_hash');
+    if(!emailRows||!emailRows.length) return; // email não existe: deixa fazerLogin tratar
+    if(!emailRows[0].senha_hash){
+      showMsg('Seu e-mail está cadastrado, mas ainda não possui uma senha associada. Clique em <strong>"Esqueci minha senha"</strong> para definir sua senha e acessar sua conta.','error');
+    } else {
+      hideMsg(); // tem senha — limpa qualquer msg anterior e deixa o cliente digitar normalmente
+    }
+  }catch(e){} // silencia erros de rede: fazerLogin tratará depois
 }
 
 async function fazerLogin(){
