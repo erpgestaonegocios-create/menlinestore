@@ -921,7 +921,10 @@ async function loadProducts(){
     // Tentar buscar produtos — se falhar com network error, mostrar orientação clara
     let data;
     try{
-      data=await api('produtos?select=*&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&ativo=eq.true&order=nome.asc');
+      // OTIMIZAÇÃO EGRESS: não trazer 'imagens_base64' nem 'imagens_cores' na listagem (arrays pesados).
+      // A foto principal (imagem_base64) é mantida para os cards; as fotos extras são carregadas
+      // sob demanda ao abrir o produto (ver openProduct). Isso reduz drasticamente o tráfego de saída.
+      data=await api('produtos?select=id,nome,descricao,preco_venda,desconto_pix,obs_site,categoria,ativo,visualizacoes,imagem_base64&perfil_codigo=eq.'+encodeURIComponent(PERFIL)+'&ativo=eq.true&order=nome.asc');
     }catch(fetchErr){
       const isNetworkErr=fetchErr.message==='Failed to fetch'||fetchErr.message.includes('NetworkError')||fetchErr.message.includes('fetch');
       if(isNetworkErr){
@@ -1053,6 +1056,19 @@ async function openProduct(id, updateUrl=true){
   if(updateUrl) location.hash='produto-'+idNum;
   const modal=document.getElementById('product-modal');
   const content=document.getElementById('product-detail-content');
+  // OTIMIZAÇÃO EGRESS: as fotos extras (imagens_base64) e o mapa de cores (imagens_cores)
+  // não vêm mais na listagem inicial. Carregamos sob demanda, só deste produto, e apenas
+  // uma vez (cache em p._imagensCarregadas) para não rebaixar se o usuário reabrir o mesmo item.
+  if(!p._imagensCarregadas){
+    try{
+      const extra=await api('produtos?id=eq.'+idNum+'&select=imagens_base64,imagens_cores&limit=1');
+      if(extra&&extra[0]){
+        p.imagens_base64=extra[0].imagens_base64;
+        p.imagens_cores=extra[0].imagens_cores;
+      }
+    }catch(e){ console.warn('Não foi possível carregar imagens extras do produto '+idNum, e); }
+    p._imagensCarregadas=true;
+  }
   // Get all images
   let imgs=[];
   if(p.imagens_base64){try{imgs=typeof p.imagens_base64==='string'?JSON.parse(p.imagens_base64):p.imagens_base64;}catch(e){}}
@@ -2772,7 +2788,9 @@ async function criarPreferenciaMP(itens, nomeCliente, emailCliente, compraIds, f
 }
 
 // ── EMAIL via Resend ─────────────────────────────────────────────
-const RESEND_KEY='re_izhU8uCt_NUtfqRdmxJDfogqAhPcYCbws';
+// A chave do Resend NÃO fica no site (código do navegador é público).
+// O envio de e-mail é feito pela Edge Function do Supabase 'resend-email',
+// que guarda a chave com segurança no servidor. Ver função dispararEmail().
 let _emailTpls={};
 
 async function carregarTemplates(){
