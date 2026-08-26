@@ -50,7 +50,12 @@ function precoFinal(p) {
 }
 
 async function fetchProdutos() {
-  const url = SUPA_URL + '/rest/v1/produtos?select=*&perfil_codigo=eq.' +
+  // OTIMIZAÇÃO EGRESS: buscar SOMENTE as colunas usadas para gerar as páginas.
+  // Antes era select=* , que baixava também imagem_base64/imagens_base64/imagens_cores
+  // (arrays Base64 pesados) a cada build — dados que este script nem usa. Isso
+  // desperdiçava muito tráfego de saída do Supabase a cada push.
+  const COLS = 'id,nome,descricao,obs_site,preco_venda,estoque_atual';
+  const url = SUPA_URL + '/rest/v1/produtos?select=' + COLS + '&perfil_codigo=eq.' +
     encodeURIComponent(PERFIL) + '&ativo=eq.true&order=nome.asc';
   const res = await fetch(url, {
     headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY }
